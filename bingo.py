@@ -52,7 +52,16 @@ i_img_name = 'camera32.jpg'
 i_img_name = 'camera33.jpg'
 i_img_name = 'camera36_1.jpg'
 
-i_img_name = 'camera03_1.jpg'  # Kosyak blya - 23 govorit
+# i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
+i_img_name = 'camera03_1.jpg'
+i_img_name = 'unnamed.jpg'
+
+
+def adjust_number_position(img):
+    contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        rect = cv2.minAreaRect(cnt)
+        ((min_x, min_y), (min_w, min_h), angle) = rect
 
 
 def result_number(result):
@@ -147,7 +156,7 @@ def read_image(image_name='croped.jpg'):
     cv_im = cv2.imread(image_name)
     height, width, channels = cv_im.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
+    # cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
 
     # cv2.imshow('rotated', cv_im)
     # key = cv2.waitKey(0)
@@ -179,9 +188,7 @@ def is_in_area_and_level(cnt, lvl):
 
 
 def is_in_area(cnt):
-    ct = cnt[0]
-
-    if cv2.contourArea(ct) >= min_contour_area and cv2.contourArea(ct) <= max_contour_area:
+    if cv2.contourArea(cnt) >= min_contour_area and cv2.contourArea(cnt) <= max_contour_area:
         # print cv2.contourArea(ct)
         return 1
     else:
@@ -190,7 +197,7 @@ def is_in_area(cnt):
 
 def filter_contours(contours, hierarchy, lvl=0):
     if ignor_hierarchy:
-        cnts = [c[0] for c in zip(contours, hierarchy) if is_in_area(c) > 0]
+        cnts = [c for c in contours if is_in_area(c) > 0]
     else:
         cnts = [c[0] for c in zip(contours, hierarchy) if is_in_area_and_level(c, lvl) > 0]
 
@@ -326,7 +333,14 @@ def read_text_by_image(argv):
 
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     # print hierarchy
-    hierarchy = hierarchy[0]
+
+
+    if hierarchy == None:
+        res_numbr = -2
+        write_num_to_db(res_numbr)
+        print "Result number:", res_numbr
+        return res_numbr
+
     # print hierarchy
     if debug_mode:
         print "Countors count: ", str(len(contours))
@@ -354,6 +368,13 @@ def read_text_by_image(argv):
     print " Done."
     unified = []
     r_text = []
+
+    if len(status) < 1:
+        res_numbr = -2
+        write_num_to_db(res_numbr)
+        print "Result number:", res_numbr
+        return res_numbr
+
     maximum = int(status.max()) + 1
 
     # print status
@@ -389,6 +410,9 @@ def read_text_by_image(argv):
                 # print rect
                 # Crop joined contours image
                 im_crop = im_thresh[y:y + h, x:x + w]
+
+                # cv2.imshow('rotated', im_crop)
+                # key = cv2.waitKey(0)
 
                 # Rotate cropped image to angle
                 if rotate_image < 1:
@@ -448,12 +472,13 @@ def read_text_by_image(argv):
         print "Result list:", l_numbs
         print "Result number:", res_numbr
 
-        if res_numbr != -1:
-            write_num_to_db(res_numbr)
+
     else:
         res_numbr = -1
         print "Result list:", 0
         print "Result number:", res_numbr
+
+    write_num_to_db(res_numbr)
 
     cv2.imwrite(output_img_name, im)
 
@@ -465,13 +490,17 @@ def read_text_by_image(argv):
 
 
 if __name__ == "__main__":
+
+    cv2.imread("")
     start_time = time.clock()
 
     args = sys.argv[1:]
     res_numbr = read_text_by_image(args)
 
+    lim_thresh_val = thresh_val
     thresh_val -= reset_thresh_val
-    while res_numbr < 0:
+
+    while res_numbr < 0 and res_numbr != -2 and thresh_val <= lim_thresh_val:
         thresh_val += 10
         res_numbr = read_text_by_image(args)
 
