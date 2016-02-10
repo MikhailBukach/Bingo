@@ -54,7 +54,9 @@ i_img_name = 'camera36_1.jpg'
 
 # i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
 i_img_name = 'camera03_1.jpg'
-i_img_name = 'unnamed.jpg'
+
+
+# i_img_name = 'unnamed.jpg'
 
 
 def adjust_number_position(img):
@@ -113,8 +115,12 @@ def write_num_to_db(win_number):
     #  you execute all the queries you need
     cur = db.cursor()
 
-    # Use all the SQL you like
-    cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0")
+    if win_number < 0:
+        sql_text = "UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0"
+    else:
+        sql_text = "UPDATE timer SET WinNumber = " + str(win_number) + ", status = 1 WHERE Status = 0"
+
+    cur.execute(sql_text)
     db.commit()
 
     '''
@@ -231,7 +237,7 @@ def sort_contours(cnts, method="left-to-right"):
 '''
 def angle_wrt_x(A,B):
     """Return the angle between B-A and the positive x-axis.
-    Values go from 0 to pi in the upper half-plane, and from 
+    Values go from 0 to pi in the upper half-plane, and from
     0 to -pi in the lower half-plane.
     """
     ax, ay = A
