@@ -118,14 +118,14 @@ cv2.imshow("blank_image", blank_image)
 cv2.waitKey(0)
 '''
 
-source_image_name = 'im_rotated_to_90_1.jpg'
+source_image_name = 'im_crop_rotated_1.jpg'
 im = cv2.imread(source_image_name)
 gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 blur = cv2.GaussianBlur(gray, (5, 5), 0)
-_, thresh = cv2.threshold(blur, 110, 255, cv2.THRESH_BINARY)
+_, thresh = cv2.threshold(blur, 170, 255, cv2.THRESH_BINARY)
 
-# cv2.imshow("thresh", thresh)
-# cv2.waitKey(0)
+cv2.imshow("thresh", thresh)
+cv2.waitKey(0)
 
 contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 hierarchy = hierarchy[0]
@@ -138,10 +138,12 @@ for component in zip(contours, hierarchy):
     currentContour = component[0]
     currentHierarchy = component[1]
 
-    if currentHierarchy[3] == 0:
+    if currentHierarchy[3] == 0:  # cv2.contourArea(currentContour) > 50: #
         rect = cv2.minAreaRect(currentContour)
         # print rect
         ((x1, y1), (w1, h1), angle) = rect
+
+        print "isContourConvex", cv2.isContourConvex(currentContour)
 
         patch = subimage(source_image_name, (x1, y1), angle, w1, h1)
 
@@ -150,17 +152,19 @@ for component in zip(contours, hierarchy):
         cv2.imwrite(patched_name, patch)
 
         if patch.shape[0] > patch.shape[1]:
-            print patch.shape
+            # print patch.shape
             txt = read_image(patched_name)
             result_list.append(txt)
 
         degrees = [90, 180, 270]
 
         for index in range(len(degrees)):
-            new_im_name = "patch" + str(degrees[index]) + "_" + str(i) + ".jpg"
 
-            patch_rotated= rotate_about_center(patch, degrees[index])
+            new_im_name = "patch_" + str(degrees[index]) + "_" + str(i) + ".jpg"
+
+            patch_rotated = rotate_about_center(patch, degrees[index])
             cv2.imwrite(new_im_name, patch_rotated)
+
 
             # Text recognition
             if patch_rotated.shape[0] > patch_rotated.shape[1]:
