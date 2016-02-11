@@ -53,17 +53,59 @@ i_img_name = 'camera33.jpg'
 i_img_name = 'camera36_1.jpg'
 
 # i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
+i_img_name = 'camera07.jpg'
+# i_img_name = 'unnamed.jpg'
 i_img_name = 'camera03_1.jpg'
 
 
-# i_img_name = 'unnamed.jpg'
+def filter_numbers_only(results_in_text, num_lim=1):
+    results_in_numbs = []
+    for str_val in results_in_text:
+        try:
+            if len(str_val) <= num_lim:
+                results_in_numbs.append(int(str_val))
+
+        except ValueError:
+            sys_exit_code = -1
+
+    return results_in_numbs
 
 
-def adjust_number_position(img):
-    contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    for cnt in contours:
-        rect = cv2.minAreaRect(cnt)
-        ((min_x, min_y), (min_w, min_h), angle) = rect
+def create_blank(width, height, rgb_color=(0, 0, 0)):
+    """Create new image(numpy array) filled with certain color in RGB"""
+    # Create black blank image
+    image = np.zeros((height, width, 3), np.uint8)
+
+    # Since OpenCV uses BGR, convert the color first
+    color = tuple(reversed(rgb_color))
+    # Fill image with color
+    image[:] = color
+
+    return image
+
+
+def subimage(image_name, centre, theta, width, height):
+    image = cv2.cv.LoadImage(image_name)
+
+    theta = np.deg2rad(theta)  # angle in radians
+
+    output_image = cv2.cv.CreateImage((int(width), int(height)), image.depth, image.nChannels)
+    mapping = np.array([[np.cos(theta), -np.sin(theta), centre[0]],
+                        [np.sin(theta), np.cos(theta), centre[1]]])
+
+    map_matrix_cv = cv2.cv.fromarray(mapping)
+
+    cv2.cv.GetQuadrangleSubPix(image, output_image, map_matrix_cv)
+    cv2.cv.SaveImage("patched.jpg", output_image)
+
+    cv2_im = cv2.imread("patched.jpg")
+
+    d = 10
+    blank_image = create_blank(width + d * 2, height + d * 2, (255, 255, 255))
+    h, w, c = cv2_im.shape
+    blank_image[d:h + d, d:w + d] = cv2_im
+    # normal_clone = cv2.seamlessClone(cv2_im, blank_image, mask, center, cv2.NORMAL_CLONE)
+    return blank_image
 
 
 def result_number(result):
@@ -76,32 +118,12 @@ def result_number(result):
     return prev
 
 
-def update_progress(progress):
-    barLength = 10  # Modify this to change the length of the progress bar
-    status = ""
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-        status = "error: progress var must be float\r\n"
-    if progress < 0:
-        progress = 0
-        status = "Halt...\r\n"
-    if progress >= 1:
-        progress = 1
-        status = "Done...\r\n"
-    block = int(round(barLength * progress))
-    text = "\rPercent: [{0}] {1}% {2}".format("#" * block + "-" * (barLength - block), progress * 100, status)
-    sys.stdout.write(text)
-    sys.stdout.flush()
-
-
-def cli_progress_test(end_val, bar_length=20):
+def searching_progress(end_val, bar_length=20):
     for i in xrange(0, end_val):
         percent = float(i) / end_val
         hashes = '#' * int(round(percent * bar_length))
         spaces = ' ' * (bar_length - len(hashes))
-        sys.stdout.write("\rPercent: [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
+        sys.stdout.write("\rSearch: [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
         sys.stdout.flush()
 
 
@@ -115,12 +137,8 @@ def write_num_to_db(win_number):
     #  you execute all the queries you need
     cur = db.cursor()
 
-    if win_number < 0:
-        sql_text = "UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0"
-    else:
-        sql_text = "UPDATE timer SET WinNumber = " + str(win_number) + ", status = 1 WHERE Status = 0"
-
-    cur.execute(sql_text)
+    # Use all the SQL you like
+    cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0")
     db.commit()
 
     '''
@@ -138,17 +156,26 @@ def filter_numbers(numbs):
     return f_numbs
 
 
-def is_numeric(s):
-    # Returns True for all non-unicode numbers
+def is_int(n):
     try:
-        s = s.decode('utf-8')
+        n = int(n)
+        return True
     except:
         return False
 
+
+def is_int(n):
     try:
-        float(s)
+        n = int(n)
         return True
     except:
+        return False
+
+
+def num_in_range(num, min, max):
+    if min <= num <= max:
+        return True
+    else:
         return False
 
 
@@ -162,7 +189,7 @@ def read_image(image_name='croped.jpg'):
     cv_im = cv2.imread(image_name)
     height, width, channels = cv_im.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
-    # cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
+    cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
 
     # cv2.imshow('rotated', cv_im)
     # key = cv2.waitKey(0)
@@ -237,7 +264,7 @@ def sort_contours(cnts, method="left-to-right"):
 '''
 def angle_wrt_x(A,B):
     """Return the angle between B-A and the positive x-axis.
-    Values go from 0 to pi in the upper half-plane, and from
+    Values go from 0 to pi in the upper half-plane, and from 
     0 to -pi in the lower half-plane.
     """
     ax, ay = A
@@ -267,9 +294,24 @@ def rotate_about_center(src, angle, scale=1.):
     # part of the transform
     rot_mat[0, 2] += rot_move[0]
     rot_mat[1, 2] += rot_move[1]
-    return cv2.warpAffine(src, rot_mat, (int(math.ceil(nw)), int(math.ceil(nh))), flags=cv2.INTER_LANCZOS4,
-                          borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255, 0))
 
+    rotated = cv2.warpAffine(src, rot_mat, (int(math.ceil(nw)), int(math.ceil(nh))), flags=cv2.INTER_LANCZOS4,
+                             borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255, 100))
+    '''
+    d = 10
+
+    height, width = rotated.shape
+    rotated[:] = (255, 255, 255)
+
+    blank_image = create_blank(width + d, height + d, (0, 0, 0))
+    print rotated.shape,blank_image.shape
+    gray = cv2.cvtColor(blank_image, cv2.COLOR_BGR2GRAY)
+
+    d = 5
+    blank_image[d:height + d, d:width + d] = rotated
+    return blank_image
+    '''
+    return rotated
 
 def read_text_by_image(argv):
     sys_exit_code = 0
@@ -363,7 +405,7 @@ def read_text_by_image(argv):
             for j, cnt2 in enumerate(contours[i + 1:]):
                 x = x + 1
                 dist = find_if_close(cnt1, cnt2)
-                cli_progress_test(x, LENGTH - 1)
+                searching_progress(x, len(contours) - 2)
                 if dist == True:
                     val = min(status[i], status[x])
                     status[x] = status[i] = val
@@ -374,6 +416,7 @@ def read_text_by_image(argv):
     print " Done."
     unified = []
     r_text = []
+    f_list = []
 
     if len(status) < 1:
         res_numbr = -2
@@ -424,13 +467,16 @@ def read_text_by_image(argv):
                 if rotate_image < 1:
                     angle = 0
                 im_crop_rotated = rotate_about_center(im_crop, angle)
-                im_rotated_name = "im_crop_rotated_" + str(i) + ".jpg"
+                im_rotated_name = "im_deg_norm_" + str(i) + ".jpg"
 
                 cv2.imwrite(im_rotated_name, im_crop_rotated)
 
                 # Text recognition
                 txt = read_image(im_rotated_name)
-                r_text.append(txt)
+                if len(txt) == 2 and is_int(txt):
+                    if num_in_range(int(txt), 0, 36):
+                        r_text.append(txt)
+                        f_list.append(im_rotated_name)
 
                 # cv2.imshow('croped', im_crop_rotated)
                 # key = cv2.waitKey(0)
@@ -439,23 +485,25 @@ def read_text_by_image(argv):
 
                 if rotate_image_clockwize:
                     for index in range(len(degrees)):
-                        new_im_name = "im_rotated_to_" + str(degrees[index]) + "_" + str(i) + ".jpg"
+                        new_im_name = "im_deg_" + str(degrees[index]) + "_" + str(i) + ".jpg"
 
                         im_rotated_to_angle = rotate_about_center(im_crop_rotated, degrees[index])
                         cv2.imwrite(new_im_name, im_rotated_to_angle)
 
                         # Text recognition
                         txt = read_image(new_im_name)
-                        r_text.append(txt)
-
-                        # cv2.imshow('rotated', im_crop_rotated_to_angle)
-                        # key = cv2.waitKey(0)
+                        if len(txt) == 2 and is_int(txt):
+                            if num_in_range(int(txt), 0, 36):
+                                r_text.append(txt)
+                                f_list.append(new_im_name)
+                                # cv2.imshow('rotated', im_crop_rotated_to_angle)
+                                # key = cv2.waitKey(0)
 
     # Draw hull of contours
     cv2.drawContours(im, unified, -1, (0, 255, 0), 2)
 
     # cv2.drawContours(thresh,unified,-1,255,-1)
-
+    print r_text, f_list
     if debug_mode:
         print r_text
 
