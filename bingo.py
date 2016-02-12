@@ -55,7 +55,7 @@ i_img_name = 'camera36_1.jpg'
 # i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
 i_img_name = 'camera07.jpg'
 # i_img_name = 'unnamed.jpg'
-i_img_name = 'camera03_1.jpg'
+i_img_name = 'camera03.jpg'
 
 
 def filter_numbers_only(results_in_text, num_lim=1):
@@ -313,34 +313,11 @@ def rotate_about_center(src, angle, scale=1.):
     '''
     return rotated
 
-def read_text_by_image(argv):
+
+def read_win_number(input_img_name, output_img_name):
     sys_exit_code = 0
-    input_img_name = ""
-    output_img_name = ""
 
     print "thresh_val = ", thresh_val
-
-    try:
-        opts, args = getopt.getopt(argv, "hi:o:", ["ifile=", "ofile="])
-    except getopt.GetoptError:
-        print 'read_text_by_image.py -i <inputfile> -o <outputfile>'
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt == '-h':
-            print 'read_text_by_image.py -i <inputfile> -o <outputfile>'
-            sys.exit(2)
-        elif opt in ("-i", "--ifile"):
-            input_img_name = arg
-        elif opt in ("-o", "--ofile"):
-            output_img_name = arg
-
-    if not os.path.isfile(input_img_name):
-        # print 'input file ' + input_img_name + ' not exists'
-        input_img_name = i_img_name
-        # sys.exit(2)
-
-    if not os.path.isfile(output_img_name):
-        output_img_name = "final.jpg"
 
     im = cv2.imread(input_img_name)
 
@@ -543,32 +520,60 @@ def read_text_by_image(argv):
     return res_numbr
 
 
+def run_with_args(argv):
+    input_img_name = ""
+    output_img_name = ""
+
+    try:
+        opts, args = getopt.getopt(argv, "hi:o:", ["ifile=", "ofile="])
+        print "args", opts, args
+    except getopt.GetoptError:
+        print 'read_text_by_image.py -i <inputfile> -o <outputfile>'
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print 'read_text_by_image.py -i <inputfile> -o <outputfile>'
+            sys.exit(2)
+        elif opt in ("-i", "--ifile"):
+            input_img_name = arg
+        elif opt in ("-o", "--ofile"):
+            output_img_name = arg
+
+    if not os.path.isfile(input_img_name):
+        # print 'input file ' + input_img_name + ' not exists'
+        input_img_name = i_img_name
+        # sys.exit(2)
+
+    if not os.path.isfile(output_img_name):
+        output_img_name = "final.jpg"
+
+    return read_win_number(input_img_name, output_img_name)
+
+
 if __name__ == "__main__":
 
-    cv2.imread("")
     start_time = time.clock()
 
     args = sys.argv[1:]
-    res_numbr = read_text_by_image(args)
+    res_numbr = run_with_args(args)
 
     lim_thresh_val = thresh_val
     thresh_val -= reset_thresh_val
 
     while res_numbr < 0 and res_numbr != -2 and thresh_val <= lim_thresh_val:
         thresh_val += 10
-        res_numbr = read_text_by_image(args)
+        res_numbr = run_with_args(args)
 
-    """
-    first_result = res_numbr
-    res_numbr = -1
+    # first_result = res_numbr
+    # res_numbr = -1
+    #
+    # thresh_val += reset_thresh_val
+    # while res_numbr < 0:
+    #     thresh_val -= 10
+    #     res_numbr = read_text_by_image(args)
+    #
+    # second_result = res_numbr
+    # print  first_result, second_result
 
-    thresh_val += reset_thresh_val
-    while res_numbr < 0:
-        thresh_val -= 10
-        res_numbr = read_text_by_image(args)
-
-    second_result = res_numbr
-    print  first_result, second_result
-    """
 
     print "Complete in ", round(time.clock() - start_time, 2), "seconds"
