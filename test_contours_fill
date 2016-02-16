@@ -1,0 +1,77 @@
+import sys, getopt
+import os.path
+import MySQLdb  # http://sourceforge.net/projects/mysql-python/files/latest/download?source=files
+import numpy as np
+import time
+import cv2
+import math
+from pytesser import *
+from PIL import Image
+
+min_contour_area = 100
+max_contour_area = 900
+
+
+def is_in_area(cnt):
+    if cv2.contourArea(cnt) >= min_contour_area and cv2.contourArea(cnt) <= max_contour_area:
+        # print cv2.contourArea(ct)
+        return 1
+    else:
+        return 0
+
+
+def filter_contours(contours):
+    cnts = [c for c in contours if is_in_area(c) > 0]
+
+    return (cnts)
+
+
+def create_blank(width, height, rgb_color=(0, 0, 0)):
+    """Create new image(numpy array) filled with certain color in RGB"""
+    # Create black blank image
+    image = np.zeros((height, width, 3), np.uint8)
+
+    # Since OpenCV uses BGR, convert the color first
+    color = tuple(reversed(rgb_color))
+    # Fill image with color
+    image[:] = color
+
+    return image
+
+
+source_image_name = 'camera02.jpg'
+im = cv2.imread(source_image_name)
+im = cv2.resize(im, (0, 0), fx=0.5, fy=0.5)
+im = im[180:200 + 180, 150:200 + 150]
+
+gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+blur = cv2.GaussianBlur(gray, (5, 5), 0)
+thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+
+contours, hierarchy = cv2.findContours(thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+print hierarchy[0]
+
+contours = filter_contours(contours)
+hull = cv2.convexHull(np.vstack(contours))
+
+print "contours", len(contours)
+
+h, w = thresh.shape
+blank = create_blank(w, h, (255, 255, 255))
+
+for cnt in contours:
+
+
+    cv2.drawContours(im, [cnt], 0, (0, 255, 0), 1)
+
+
+
+    cv2.drawContours(blank, [cnt], 0, (0, 0, 0), -1)
+    cv2.drawContours(blank, [cnt], 0, (0, 255, 0), 1)
+
+cv2.drawContours(im, [hull], -1, (255, 0, 0), 2)
+
+cv2.imshow("blank", blank)
+cv2.imshow("im", im)
+cv2.waitKey(0)
