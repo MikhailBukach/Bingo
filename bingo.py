@@ -20,7 +20,7 @@ max_contour_area = 2000
 min_hull_area = 1300
 max_hull_area = 4000
 
-debug_mode = 0
+debug_mode = 1
 
 rotate_image = 1
 rotate_image_clockwize = 1
@@ -55,7 +55,7 @@ i_img_name = 'camera36_1.jpg'
 # i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
 i_img_name = 'camera07.jpg'
 # i_img_name = 'unnamed.jpg'
-i_img_name = 'camera03.jpg'
+i_img_name = 'camera20.jpg'
 
 
 def final_check(r_num, f_name):
@@ -95,8 +95,7 @@ def final_check(r_num, f_name):
 
     contours = sort_contours(contours)
 
-
-    if  len(contours) != 2 :
+    if len(contours) != 2:
         return -1
 
     # Test first number
@@ -265,8 +264,8 @@ def read_image(image_name='croped.jpg'):
 
     cv_im = cv2.imread(image_name)
     height, width, channels = cv_im.shape
-    # font = cv2.FONT_HERSHEY_SIMPLEX
-    # cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
 
     # cv2.imshow('rotated', cv_im)
     # key = cv2.waitKey(0)
@@ -396,6 +395,10 @@ def read_win_number(input_img_name, output_img_name):
 
     print "thresh_val = ", thresh_val
 
+    if not os.path.isfile(input_img_name):
+        print "File", input_img_name, "not exists."
+        return -1
+
     im = cv2.imread(input_img_name)
 
     img_height, img_width, a = im.shape
@@ -421,8 +424,8 @@ def read_win_number(input_img_name, output_img_name):
     # cv2.imshow('blur',blur)
     # key = cv2.waitKey(0)
 
-    # thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-    _, thresh = cv2.threshold(blur, thresh_val, 255, cv2.THRESH_BINARY)
+    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    # _, thresh = cv2.threshold(blur, thresh_val, 255, cv2.THRESH_BINARY)
     cv2.imwrite("thresh.jpg", thresh)
 
     if debug_mode:
@@ -576,7 +579,7 @@ def read_win_number(input_img_name, output_img_name):
 
     if len(l_numbs) > 0:
         res_numbr = result_number(l_numbs)
-        res_numbr = final_check(res_numbr, f_list[0])
+        # res_numbr = final_check(res_numbr, f_list[0])
 
         print "Result list:", l_numbs
         print "Result number:", res_numbr
@@ -629,18 +632,17 @@ def run_with_args(argv):
 
 
 if __name__ == "__main__":
-
     start_time = time.clock()
 
     args = sys.argv[1:]
     res_numbr = run_with_args(args)
 
-    lim_thresh_val = thresh_val
-    thresh_val -= reset_thresh_val
-
-    while res_numbr < 0 and res_numbr != -2 and thresh_val <= lim_thresh_val:
-        thresh_val += 10
-        res_numbr = run_with_args(args)
+    # lim_thresh_val = thresh_val
+    # thresh_val -= reset_thresh_val
+    #
+    # while res_numbr < 0 and res_numbr != -2 and thresh_val <= lim_thresh_val:
+    #     thresh_val += 10
+    #     res_numbr = run_with_args(args)
 
     # first_result = res_numbr
     # res_numbr = -1
