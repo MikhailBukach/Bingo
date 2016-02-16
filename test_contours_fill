@@ -10,6 +10,83 @@ from PIL import Image
 
 min_contour_area = 100
 max_contour_area = 900
+contour_distance = 20
+
+
+def sort_contours(cnts, method="left-to-right"):
+    # initialize the reverse flag and sort index
+    reverse = False
+    i = 0
+
+    # handle if we need to sort in reverse
+    if method == "right-to-left" or method == "bottom-to-top":
+        reverse = True
+
+    # handle if we are sorting against the y-coordinate rather than
+    # the x-coordinate of the bounding box
+    if method == "top-to-bottom" or method == "bottom-to-top":
+        i = 1
+
+    # construct the list of bounding boxes and sort them from top to
+    # bottom
+    boundingBoxes = [cv2.boundingRect(c) for c in cnts]
+    (cnts, boundingBoxes) = zip(*sorted(zip(cnts, boundingBoxes), key=lambda b: b[1][i], reverse=reverse))
+
+    # return the list of sorted contours and bounding boxes
+    return (cnts)  # (cnts, boundingBoxes)
+
+
+def searching_progress(end_val, bar_length=20):
+    for i in xrange(0, end_val):
+        percent = float(i) / end_val
+        hashes = '#' * int(round(percent * bar_length))
+        spaces = ' ' * (bar_length - len(hashes))
+        sys.stdout.write("\rSearch: [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
+        sys.stdout.flush()
+
+
+def find_if_close(cnt1, cnt2):
+    row1, row2 = cnt1.shape[0], cnt2.shape[0]
+    for i in xrange(row1):
+        for j in xrange(row2):
+            dist = np.linalg.norm(cnt1[i] - cnt2[j])
+            if abs(dist) < contour_distance:
+                return True
+            elif i == row1 - 1 and j == row2 - 1:
+                return False
+
+
+def find_hulls(contours):
+    LENGTH = len(contours)
+
+    status = np.zeros((LENGTH, 1))
+    for i, cnt1 in enumerate(contours):
+        x = i
+        if i != LENGTH - 1:
+            for j, cnt2 in enumerate(contours[i + 1:]):
+                x = x + 1
+                dist = find_if_close(cnt1, cnt2)
+                searching_progress(x, len(contours) - 2)
+                if dist == True:
+                    val = min(status[i], status[x])
+                    status[x] = status[i] = val
+                else:
+                    if status[x] == status[i]:
+                        status[x] = i + 1
+
+    print " Done."
+    unified = []
+
+    maximum = int(status.max()) + 1
+
+    for i in xrange(maximum):
+        pos = np.where(status == i)[0]
+        if pos.size != 0:
+            cont = np.vstack(contours[i] for i in pos)
+            hull = cv2.convexHull(cont)
+            unified.append(hull)
+
+    return unified
 
 
 def is_in_area(cnt):
@@ -20,9 +97,33 @@ def is_in_area(cnt):
         return 0
 
 
+def subimage(image_name, centre, theta, width, height):
+    image = cv2.cv.LoadImage(image_name)
+
+    theta = np.deg2rad(theta)  # angle in radians
+
+    output_image = cv2.cv.CreateImage((int(width), int(height)), image.depth, image.nChannels)
+    mapping = np.array([[np.cos(theta), -np.sin(theta), centre[0]],
+                        [np.sin(theta), np.cos(theta), centre[1]]])
+
+    map_matrix_cv = cv2.cv.fromarray(mapping)
+
+    cv2.cv.GetQuadrangleSubPix(image, output_image, map_matrix_cv)
+    cv2.cv.SaveImage("patched.jpg", output_image)
+
+    cv2_im = cv2.imread("patched.jpg")
+
+    d = 10
+    blank_image = create_blank(width + d * 2, height + d * 2, (255, 255, 255))
+    h, w, c = cv2_im.shape
+    blank_image[d:h + d, d:w + d] = cv2_im
+    # normal_clone = cv2.seamlessClone(cv2_im, blank_image, mask, center, cv2.NORMAL_CLONE)
+    return blank_image
+
+
 def filter_contours(contours):
     cnts = [c for c in contours if is_in_area(c) > 0]
-
+    # cnts, hry = [zip(c[0], c[1]) for c in zip(contours, hierarchy) if is_in_area(c[0]) > 0]
     return (cnts)
 
 
@@ -48,29 +149,45 @@ gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 blur = cv2.GaussianBlur(gray, (5, 5), 0)
 thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
+thresh_im_name = "thresh.jpg"
+cv2.imwrite(thresh_im_name, thresh)
+
 contours, hierarchy = cv2.findContours(thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 print hierarchy[0]
 
 contours = filter_contours(contours)
-hull = cv2.convexHull(np.vstack(contours))
+
+hulls = find_hulls(contours)
+
+i = 0
+for hull in hulls:
+    rect = cv2.minAreaRect(hull)
+    ((x1, y1), (w1, h1), angle) = rect
+
+    hull_im = subimage(thresh_im_name, (x1, y1), angle, w1, h1)
+    cv2.imshow("hull_im_" + str(i), hull_im)
+    i += 1
+    # cv2.waitKey(0)
+
+# contours = sort_contours(contours)
+
+# hull = cv2.convexHull(np.vstack(contours))
 
 print "contours", len(contours)
 
 h, w = thresh.shape
 blank = create_blank(w, h, (255, 255, 255))
 
+cv2.drawContours(im, hulls, -1, (0, 255, 0), 2)
+
 for cnt in contours:
-
-
     cv2.drawContours(im, [cnt], 0, (0, 255, 0), 1)
-
-
 
     cv2.drawContours(blank, [cnt], 0, (0, 0, 0), -1)
     cv2.drawContours(blank, [cnt], 0, (0, 255, 0), 1)
 
-cv2.drawContours(im, [hull], -1, (255, 0, 0), 2)
+# cv2.drawContours(im, [hull], -1, (255, 0, 0), 2)
 
 cv2.imshow("blank", blank)
 cv2.imshow("im", im)
