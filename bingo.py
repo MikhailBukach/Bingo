@@ -58,6 +58,87 @@ i_img_name = 'camera07.jpg'
 i_img_name = 'camera03.jpg'
 
 
+def final_check(r_num, f_name):
+    global ignor_hierarchy
+    global min_contour_area
+    global max_contour_area
+
+    first_num_name = 'first_num.jpg'
+    second_num_name = 'second_num.jpg'
+
+    fnum = -1
+    snum = -1
+    if r_num < 10:
+        fnum = 0
+        snum = r_num
+    else:
+        fnum = str(r_num)[:1]
+        snum = str(r_num)[1:]
+
+    im = cv2.imread(f_name)
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blur, 170, 255, cv2.THRESH_BINARY)
+    # cv2.imshow("thresh", thresh)
+    # cv2.waitKey(0)
+    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    hierarchy = hierarchy[0]
+
+    orig_ignor_hierarchy = ignor_hierarchy
+    ignor_hierarchy = 0
+    contours = filter_contours(contours, hierarchy)
+    ignor_hierarchy = orig_ignor_hierarchy
+
+    cv2.drawContours(im, contours, 0, (0, 0, 255), 2)
+    # cv2.imshow("cnt", im)
+    # cv2.waitKey(0)
+
+    contours = sort_contours(contours)
+
+
+    if  len(contours) != 2 :
+        return -1
+
+    # Test first number
+    rect = cv2.minAreaRect(contours[0])
+    # print rect
+    ((x1, y1), (w1, h1), angle) = rect
+    if abs(angle) < 30:
+        first_num = subimage(f_name, (x1, y1), angle, w1, h1)
+        cv2.imwrite(first_num_name, first_num)
+
+    txt_fnum = read_image(first_num_name)
+
+    if is_int(txt_fnum):
+        if fnum != int(txt_fnum):
+            print "Final Check: firs number ", txt_fnum, " is incorrect."
+            return -1
+    else:
+        print "Final Check: firs number ", txt_fnum, " is incorrect."
+        return -1
+
+    # Test second number
+    rect = cv2.minAreaRect(contours[1])
+    # print rect
+    ((x1, y1), (w1, h1), angle) = rect
+
+    if abs(angle) < 30:
+        second_num = subimage(f_name, (x1, y1), angle, w1, h1)
+        cv2.imwrite(second_num_name, second_num)
+
+    txt_fnum = read_image(second_num_name)
+    if is_int(txt_fnum):
+        if fnum != int(txt_fnum):
+            print "Final Check: second number ", txt_fnum, " is incorrect."
+            return -1
+    else:
+        print "Final Check: firs number ", txt_fnum, " is incorrect."
+        return -1
+
+    print "Final Check: Ok."
+    return r_num
+
+
 def filter_numbers_only(results_in_text, num_lim=1):
     results_in_numbs = []
     for str_val in results_in_text:
@@ -128,40 +209,36 @@ def searching_progress(end_val, bar_length=20):
 
 
 def write_num_to_db(win_number):
-    db = MySQLdb.connect(host="localhost",  # your host, usually localhost
-                         user="root",  # your username
-                         passwd="",  # your password
-                         db="bingo")  # name of the data base
+    try:
+        db = MySQLdb.connect(host="localhost",  # your host, usually localhost
+                             user="root",  # your username
+                             passwd="",  # your password
+                             db="bingo")  # name of the data base
 
-    # you must create a Cursor object. It will let
-    #  you execute all the queries you need
-    cur = db.cursor()
+        # you must create a Cursor object. It will let
+        #  you execute all the queries you need
+        cur = db.cursor()
 
-    # Use all the SQL you like
-    cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0")
-    db.commit()
+        # Use all the SQL you like
+        cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0")
+        db.commit()
 
-    '''
-    # print all the first cell of all the rows
-    for row in cur.fetchall():
-        print row[0]
-    '''
-    db.close()
-    print "Table 'timer' updated, WinNumber = ", win_number
+        '''
+        # print all the first cell of all the rows
+        for row in cur.fetchall():
+            print row[0]
+        '''
+        db.close()
+        print "Table 'timer' updated, WinNumber = ", win_number
+
+    except MySQLdb.Error, e:
+        print "MySQL ERROR:", e
 
 
 # Filter numbers from 0 to 36
 def filter_numbers(numbs):
     f_numbs = [c for c in numbs if c >= 0 and c <= 36]
     return f_numbs
-
-
-def is_int(n):
-    try:
-        n = int(n)
-        return True
-    except:
-        return False
 
 
 def is_int(n):
@@ -188,8 +265,8 @@ def read_image(image_name='croped.jpg'):
 
     cv_im = cv2.imread(image_name)
     height, width, channels = cv_im.shape
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
+    # font = cv2.FONT_HERSHEY_SIMPLEX
+    # cv2.putText(cv_im, txt, (int(0), int(20)), font, 0.8, (0, 0, 255), 2)
 
     # cv2.imshow('rotated', cv_im)
     # key = cv2.waitKey(0)
@@ -258,13 +335,13 @@ def sort_contours(cnts, method="left-to-right"):
     (cnts, boundingBoxes) = zip(*sorted(zip(cnts, boundingBoxes), key=lambda b: b[1][i], reverse=reverse))
 
     # return the list of sorted contours and bounding boxes
-    return (cnts, boundingBoxes)
+    return (cnts)  # (cnts, boundingBoxes)
 
 
 '''
 def angle_wrt_x(A,B):
     """Return the angle between B-A and the positive x-axis.
-    Values go from 0 to pi in the upper half-plane, and from 
+    Values go from 0 to pi in the upper half-plane, and from
     0 to -pi in the lower half-plane.
     """
     ax, ay = A
@@ -499,6 +576,7 @@ def read_win_number(input_img_name, output_img_name):
 
     if len(l_numbs) > 0:
         res_numbr = result_number(l_numbs)
+        res_numbr = final_check(res_numbr, f_list[0])
 
         print "Result list:", l_numbs
         print "Result number:", res_numbr
