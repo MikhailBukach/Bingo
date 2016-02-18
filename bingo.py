@@ -10,6 +10,9 @@ from PIL import Image
 
 start_time = 0
 
+hough_circles_dp = 1.4
+hough_circles_min_dist = 300
+
 thresh_val = 170
 reset_thresh_val = 60
 contour_distance = 10
@@ -20,7 +23,7 @@ max_contour_area = 2000
 min_hull_area = 1300
 max_hull_area = 4000
 
-debug_mode = 1
+debug_mode = 0
 
 rotate_image = 1
 rotate_image_clockwize = 1
@@ -53,9 +56,50 @@ i_img_name = 'camera33.jpg'
 i_img_name = 'camera36_1.jpg'
 
 # i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
-i_img_name = 'camera07.jpg'
+i_img_name = 'camera15.jpg'
+
 # i_img_name = 'unnamed.jpg'
-i_img_name = 'camera20.jpg'
+
+
+# i_img_name = 'camera20.jpg'
+
+def find_a_ball(grey_image):
+    # detect circles in the image
+
+    circles = cv2.HoughCircles(grey_image, cv2.cv.CV_HOUGH_GRADIENT, hough_circles_dp, hough_circles_min_dist)
+
+
+
+    # ensure at least some circles were found
+    if circles is not None:
+
+        if len(circles) > 1:
+            print "To many Circles:", len(circles)
+            return None
+
+        # convert the (x, y) coordinates and radius of the circles to integers
+        circles = np.round(circles[0, :]).astype("int")
+        output_image = grey_image.copy()
+        # loop over the (x, y) coordinates and radius of the circles
+        for (x, y, r) in circles:
+            # draw the circle in the output image, then draw a rectangle
+            # corresponding to the center of the circle
+            cv2.circle(output_image, (x, y), r, (0, 255, 0), 4)
+            cv2.rectangle(output_image, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
+            output_image = output_image[y - r:r * 2 + y - r, x - r:r * 2 + x - r]
+            grey_image = grey_image[y - r:r * 2 + y - r, x - r:r * 2 + x - r]
+
+            print "We have found a ball, image croped to", r * 2, r * 2
+
+        # show the output image
+        cv2.imwrite("grey_ball.jpg", output_image)
+        if debug_mode:
+            cv2.imshow("grey_ball", output_image)
+            cv2.waitKey(0)
+        return grey_image.copy()
+    else:
+        print "The ball not found"
+        return None
 
 
 def final_check(r_num, f_name):
@@ -412,13 +456,24 @@ def read_win_number(input_img_name, output_img_name):
     img_height, img_width, a = im.shape
     print "Resized to", img_width, img_height, a
 
-    im = im[180:200 + 180, 150:200 + 150]
+    # im = im[180:200 + 180, 150:200 + 150]
 
-    img_height, img_width, a = im.shape
-    print "Croped to", img_width, img_height, a
+    # img_height, img_width, a = im.shape
+    # print "Croped to", img_width, img_height, a
 
     gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    blur = find_a_ball(blur)
+
+
+    if gray is None:
+        res_numbr = -2
+        write_num_to_db(res_numbr)
+        print "Result number:", res_numbr
+        return res_numbr
+
+
     cv2.imwrite("blur.jpg", blur)
 
     # cv2.imshow('blur',blur)
@@ -426,11 +481,18 @@ def read_win_number(input_img_name, output_img_name):
 
     thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
     # _, thresh = cv2.threshold(blur, thresh_val, 255, cv2.THRESH_BINARY)
+
+    if thresh is None:
+        res_numbr = -2
+        write_num_to_db(res_numbr)
+        print "Result number:", res_numbr
+        return res_numbr
+
     cv2.imwrite("thresh.jpg", thresh)
 
     if debug_mode:
         cv2.imshow('thresh', thresh)
-        key = cv2.waitKey(0)
+        # key = cv2.waitKey(0)
 
     im_thresh = thresh.copy()
     # cv2.imshow('norm1',im4)
@@ -557,12 +619,20 @@ def read_win_number(input_img_name, output_img_name):
                                 # key = cv2.waitKey(0)
 
     # Draw hull of contours
-    cv2.drawContours(im, unified, -1, (0, 255, 0), 2)
+    cv2.drawContours(blur, unified, -1, (0, 255, 0), 2)
+
+    if debug_mode:
+        cv2.imshow("final", blur)
+        key = cv2.waitKey(0)
 
     # cv2.drawContours(thresh,unified,-1,255,-1)
     print r_text, f_list
-    if debug_mode:
-        print r_text
+
+    if len(r_text) < 1:
+        res_numbr = -1
+        write_num_to_db(res_numbr)
+        print "Result number:", res_numbr
+        return res_numbr
 
     l_numbs = []
     for str_val in r_text:
@@ -592,11 +662,7 @@ def read_win_number(input_img_name, output_img_name):
 
     write_num_to_db(res_numbr)
 
-    cv2.imwrite(output_img_name, im)
-
-    if debug_mode:
-        cv2.imshow("final", im)
-        key = cv2.waitKey(0)
+    cv2.imwrite(output_img_name, blur)
 
     return res_numbr
 
