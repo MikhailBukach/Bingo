@@ -1,7 +1,7 @@
 import sys, getopt
 import os.path
 import MySQLdb  # http://sourceforge.net/projects/mysql-python/files/latest/download?source=files
-import numpy as np
+import numpy as np  # https://sourceforge.net/projects/numpy/files/NumPy/
 import time
 import cv2
 import math
@@ -56,7 +56,8 @@ i_img_name = 'camera33.jpg'
 i_img_name = 'camera36_1.jpg'
 
 # i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
-i_img_name = 'camera15.jpg'
+i_img_name = 'camera16.jpg'
+
 
 # i_img_name = 'unnamed.jpg'
 
@@ -66,9 +67,7 @@ i_img_name = 'camera15.jpg'
 def find_a_ball(grey_image):
     # detect circles in the image
 
-    circles = cv2.HoughCircles(grey_image, cv2.cv.CV_HOUGH_GRADIENT, hough_circles_dp, hough_circles_min_dist)
-
-
+    circles = cv2.HoughCircles(grey_image, 3, hough_circles_dp, hough_circles_min_dist)
 
     # ensure at least some circles were found
     if circles is not None:
@@ -263,7 +262,7 @@ def write_num_to_db(win_number):
         cur = db.cursor()
 
         # Use all the SQL you like
-        cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0")
+        cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + ", Status = 1 WHERE Status = 0")
         db.commit()
 
         '''
@@ -466,13 +465,11 @@ def read_win_number(input_img_name, output_img_name):
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     blur = find_a_ball(blur)
 
-
     if gray is None:
         res_numbr = -2
         write_num_to_db(res_numbr)
         print "Result number:", res_numbr
         return res_numbr
-
 
     cv2.imwrite("blur.jpg", blur)
 
@@ -498,7 +495,7 @@ def read_win_number(input_img_name, output_img_name):
     # cv2.imshow('norm1',im4)
 
 
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    _, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     # print hierarchy
 
 
@@ -560,7 +557,7 @@ def read_win_number(input_img_name, output_img_name):
             rect = cv2.minAreaRect(hull)
             ((x1, y1), (w1, h1), angle) = rect
 
-            box = cv2.cv.BoxPoints(rect)
+            box = cv2.boxPoints(rect)
             # box = np.int0(box)
             # cv2.drawContours(im,[box],0,(0,255,0),2)
 
