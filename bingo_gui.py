@@ -1,39 +1,39 @@
 from Tkinter import *
 import tkFont
+import subprocess
 from PIL import ImageTk, Image
+from bingo_config import *
 from bingo import *
 import os
 import time
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
-from datetime import timedelta
+import mp709
+import urllib.request
 
-start_time = 0
-gui = None
-scheduler = None
-started = False
-busy = False
-delay = 0
-steps = []
-base_sequence = [("photo", 1), ("delay", 10), ("shuffle", 5), ("delay", 3), ("pickup", 3), ("photo", 3), ("readnum", 2)]
-sequence_1 = [("delay", 2), ("blow", 3), ("photo", 2), ("readnum", 2)]
-sequence_2 = [("shuffle", 5), ("delay", 3), ("pickup", 3), ("photo", 2), ("readnum", 2)]
-attempt = 1
-attempts_limit = 3
-step_id = 0
 
+# from datetime import datetime
+# from datetime import timedelta
 
 # def callback_threaded(label):
 #     threading.Thread(target=read_number(label)).start()
 
+
+def switch_dev(id, state):
+    control = mp709.relaysControl()
+    control.setId(id)
+    control.setState(state)
+    control.main()
+
+
+def start_new_game():
+    urllib.request.urlopen(start_new_game_url)
+
+
 def fetch_form_db():
     global gui
     try:
-        db = MySQLdb.connect(host="localhost",  # your host, usually localhost
-                             user="root",  # your username
-                             passwd="",  # your password
-                             db="bingo")  # name of the data base
+        db = get_connection()
 
         # you must create a Cursor object. It will let
         #  you execute all the queries you need
@@ -112,15 +112,47 @@ def run_action(action):
         run_take_photo()
         print "Done"
 
+    if action == 'all_dev_off':
+        switch_dev(dev_shuffle, "off")
+        switch_dev(dev_pickup, "off")
+        switch_dev(dev_blow, "off")
+
+    if action == 'shuffle_on':
+        switch_dev(dev_shuffle, "on")
+
+    if action == 'shuffle_off':
+        switch_dev(dev_shuffle, "off")
+
+    if action == 'pickup_on':
+        switch_dev(dev_pickup, "on")
+
+    if action == 'pickup_off':
+        switch_dev(dev_pickup, "off")
+
+    if action == 'blow_on':
+        switch_dev(dev_blow, "on")
+
+    if action == 'blow_off':
+        switch_dev(dev_blow, "off")
+
     busy = False
 
 
 def run_take_photo():
-    image_name = "camera15.jpg"
-    im = cv2.imread(image_name)
-    im = cv2.resize(im, (0, 0), fx=0.5, fy=0.5)
-    cv2.imwrite("resized_" + image_name, im)
-    gui.update_image("resized_" + image_name)
+    global camera_image
+    global images_folder
+
+    try:
+        # args = [take_image_exec]
+        # proc = subprocess.Popen(args)
+        # retcode = proc.wait()
+
+        im = cv2.imread(camera_image)
+        im = cv2.resize(im, (0, 0), fx=0.5, fy=0.5)
+        cv2.imwrite(images_folder + "resized.jpg", im)
+        gui.update_image(images_folder + "resized.jpg")
+    except Exception:
+        print Exception
 
 
 def run_read_num():
@@ -129,11 +161,12 @@ def run_read_num():
     global step_id
     global attempt
     global attempts_limit
+    global camera_image
+    global images_folder
 
-    image_name = "camera15.jpg"
-    res_numbr = read_win_number(image_name, "final.jpg")
+    res_numbr = read_win_number(camera_image, images_folder + "final.jpg")
     fetch_form_db()
-    gui.update_image("grey_ball.jpg")
+    gui.update_image(images_folder + "grey_ball.jpg")
 
     if res_numbr == -1 and attempt < attempts_limit:
         steps = list(sequence_1)
@@ -141,7 +174,7 @@ def run_read_num():
         step_id = 0
     else:
         attempt = 1
-        steps = list(base_sequence)
+        steps = list(main_sequence)
         step_id = 0
 
     if res_numbr == -2:
@@ -169,63 +202,25 @@ def start_stop(label):
         gui.btn_start_stop.config(fg="darkgreen")
 
 
-
-        # if not started:
-        #     for job in scheduler.get_jobs():
-        #         job.resume()
-        #         started = True
-        #         gui.btn_start_stop.config(text="Stop")
-        #
-        # else:
-        #     for job in scheduler.get_jobs():
-        #         job.pause()
-        #         started = False
-        #         gui.btn_start_stop.config(text="Start")
-
-
-        # start_time = time.clock()
-        #
-        # image_name = "camera03_1.jpg"
-        #
-        # label.config(text="Please wait...")
-        #
-        # args = sys.argv[1:]
-        # res_numbr = read_win_number(image_name, "final.jpg")
-        #
-        # lim_thresh_val = thresh_val
-        # thresh_val -= reset_thresh_val
-        #
-        # while res_numbr < 0 and res_numbr != -2 and thresh_val <= lim_thresh_val:
-        #     thresh_val += 10
-        #     res_numbr = read_win_number(image_name, "final.jpg")
-        #
-        # str_res_number = str(res_numbr)
-        # if len(str_res_number) > 10:
-        #     str_res_number = '0' + str_res_number
-        #
-        # label.config(text=str_res_number)
-        #
-        # print "Complete in ", round(time.clock() - start_time, 2), "seconds"
-
-
 def reset_game():
     global steps
     global start_time
     global started
 
-    steps = list(base_sequence)
+    steps = list(main_sequence)
     start_time = 0
     started = True
 
 
-class BingoTkApp(threading.Thread):
+# class BingoTkApp(threading.Thread):
+class BingoTkApp():
     def __init__(self):
         self.end_item = None
         self.root = Tk()
         self.root.wm_title("Bingo GUI")
         self.row1 = Frame(self.root)
 
-        self.img = ImageTk.PhotoImage(Image.open("no-image.jpg"))
+        self.img = ImageTk.PhotoImage(Image.open(default_image))
         self.img_box = Label(self.row1, image=self.img, width=60, height=60, bg='grey')
         self.img_box.pack(side=LEFT, fill=BOTH, expand="yes")
 
@@ -273,7 +268,7 @@ class BingoTkApp(threading.Thread):
 
         self.row2.pack(side=TOP, fill=BOTH)
 
-        threading.Thread.__init__(self)
+        # threading.Thread.__init__(self)
 
     def update_image(self, image_name):
         self.img = ImageTk.PhotoImage(Image.open(image_name))
@@ -292,6 +287,7 @@ class BingoTkApp(threading.Thread):
         self.lbl_attempt.config(fg=color)
 
     def run(self):
+        scheduler.start()
         self.root.mainloop()
 
 
@@ -299,7 +295,7 @@ if __name__ == "__main__":
     scheduler = BackgroundScheduler()
     scheduler.add_job(tick, 'interval', seconds=1, id='job_timer_tick')
     # scheduler.add_job(run_read_num,  'interval', seconds=1, id='job_run_read_num')
-    scheduler.start()
+
 
     gui = BingoTkApp()
     gui.run()
