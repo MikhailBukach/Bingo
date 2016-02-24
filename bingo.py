@@ -1,32 +1,13 @@
 import sys, getopt
 import os.path
 import MySQLdb  # http://sourceforge.net/projects/mysql-python/files/latest/download?source=files
+from  bingo_config import *
 import numpy as np  # https://sourceforge.net/projects/numpy/files/NumPy/
 import time
 import cv2
 import math
 from pytesser import *
 from PIL import Image
-
-start_time = 0
-
-hough_circles_dp = 1.4
-hough_circles_min_dist = 300
-
-thresh_val = 170
-reset_thresh_val = 60
-contour_distance = 10
-ignor_hierarchy = 1
-min_contour_area = 200
-max_contour_area = 2000
-
-min_hull_area = 1300
-max_hull_area = 4000
-
-debug_mode = 0
-
-rotate_image = 1
-rotate_image_clockwize = 1
 
 i_img_name = 'camera02.jpg'
 i_img_name = 'camera03.jpg'
@@ -56,7 +37,7 @@ i_img_name = 'camera33.jpg'
 i_img_name = 'camera36_1.jpg'
 
 # i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
-i_img_name = 'camera16.jpg'
+i_img_name = 'camera0.jpg'
 
 
 # i_img_name = 'unnamed.jpg'
@@ -91,9 +72,9 @@ def find_a_ball(grey_image):
             print "We have found a ball, image croped to", r * 2, r * 2
 
         # show the output image
-        cv2.imwrite("grey_ball.jpg", output_image)
+        cv2.imwrite(images_folder + "grey_ball.jpg", output_image)
         if debug_mode:
-            cv2.imshow("grey_ball", output_image)
+            cv2.imshow(images_folder + "grey_ball", output_image)
             cv2.waitKey(0)
         return grey_image.copy()
     else:
@@ -252,10 +233,7 @@ def searching_progress(end_val, bar_length=20):
 
 def write_num_to_db(win_number):
     try:
-        db = MySQLdb.connect(host="localhost",  # your host, usually localhost
-                             user="root",  # your username
-                             passwd="",  # your password
-                             db="bingo")  # name of the data base
+        db = get_connection()
 
         # you must create a Cursor object. It will let
         #  you execute all the queries you need
@@ -471,7 +449,7 @@ def read_win_number(input_img_name, output_img_name):
         print "Result number:", res_numbr
         return res_numbr
 
-    cv2.imwrite("blur.jpg", blur)
+    cv2.imwrite(images_folder + "blur.jpg", blur)
 
     # cv2.imshow('blur',blur)
     # key = cv2.waitKey(0)
@@ -485,7 +463,7 @@ def read_win_number(input_img_name, output_img_name):
         print "Result number:", res_numbr
         return res_numbr
 
-    cv2.imwrite("thresh.jpg", thresh)
+    cv2.imwrite(images_folder + "thresh.jpg", thresh)
 
     if debug_mode:
         cv2.imshow('thresh', thresh)
@@ -583,7 +561,7 @@ def read_win_number(input_img_name, output_img_name):
                 if rotate_image < 1:
                     angle = 0
                 im_crop_rotated = rotate_about_center(im_crop, angle)
-                im_rotated_name = "im_deg_norm_" + str(i) + ".jpg"
+                im_rotated_name = images_folder + "im_deg_norm_" + str(i) + ".jpg"
 
                 cv2.imwrite(im_rotated_name, im_crop_rotated)
 
@@ -601,7 +579,7 @@ def read_win_number(input_img_name, output_img_name):
 
                 if rotate_image_clockwize:
                     for index in range(len(degrees)):
-                        new_im_name = "im_deg_" + str(degrees[index]) + "_" + str(i) + ".jpg"
+                        new_im_name = images_folder + "im_deg_" + str(degrees[index]) + "_" + str(i) + ".jpg"
 
                         im_rotated_to_angle = rotate_about_center(im_crop_rotated, degrees[index])
                         cv2.imwrite(new_im_name, im_rotated_to_angle)
@@ -685,7 +663,7 @@ def run_with_args(argv):
 
     if not os.path.isfile(input_img_name):
         # print 'input file ' + input_img_name + ' not exists'
-        input_img_name = i_img_name
+        input_img_name = images_folder + i_img_name
         # sys.exit(2)
 
     if not os.path.isfile(output_img_name):
