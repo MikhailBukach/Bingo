@@ -9,41 +9,9 @@ import math
 from pytesser import *
 from PIL import Image
 
-i_img_name = 'camera02.jpg'
-i_img_name = 'camera03.jpg'
-i_img_name = 'camera03_1.jpg'
-i_img_name = 'camera03_2.jpg'
-i_img_name = 'camera04.jpg'
-i_img_name = 'camera05.jpg'
-i_img_name = 'camera07.jpg'
-i_img_name = 'camera08.jpg'
-i_img_name = 'camera08_1.jpg'
-i_img_name = 'camera09.jpg'
-# i_img_name = 'camera15.jpg'
-i_img_name = 'camera16.jpg'
-i_img_name = 'camera16_1.jpg'
-i_img_name = 'camera18.jpg'
-# i_img_name = 'camera19.jpg'
-i_img_name = 'camera19_1.jpg'
-i_img_name = 'camera19_2.jpg'
-# i_img_name = 'camera20.jpg'
-i_img_name = 'camera26.jpg'
-i_img_name = 'camera28.jpg'
-i_img_name = 'camera29.jpg'
-i_img_name = 'camera29.jpg'
-i_img_name = 'camera31.jpg'
-i_img_name = 'camera32.jpg'
-i_img_name = 'camera33.jpg'
-i_img_name = 'camera36_1.jpg'
-
-# i_img_name = 'unnamed.jpg'  # Kosyak blya - 23 govorit
-i_img_name = 'camera0.jpg'
-
-
 # i_img_name = 'unnamed.jpg'
+i_img_name = 'camera20.jpg'
 
-
-# i_img_name = 'camera20.jpg'
 
 def find_a_ball(grey_image):
     # detect circles in the image
@@ -240,7 +208,7 @@ def write_num_to_db(win_number):
         cur = db.cursor()
 
         # Use all the SQL you like
-        cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + ", Status = 1 WHERE Status = 0")
+        cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + ", Status = 0 WHERE Status = 0")
         db.commit()
 
         '''
@@ -667,7 +635,7 @@ def run_with_args(argv):
         # sys.exit(2)
 
     if not os.path.isfile(output_img_name):
-        output_img_name = "final.jpg"
+        output_img_name = images_folder + "final.jpg"
 
     return read_win_number(input_img_name, output_img_name)
 
