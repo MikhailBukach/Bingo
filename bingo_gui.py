@@ -9,7 +9,11 @@ import time
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 import mp709
-import urllib.request
+# import urllib.request
+import urllib2
+from datetime import datetime
+
+game_id = 0
 
 
 # from datetime import datetime
@@ -20,14 +24,29 @@ import urllib.request
 
 
 def switch_dev(id, state):
-    control = mp709.relaysControl()
-    control.setId(id)
-    control.setState(state)
-    control.main()
+    try:
+        control = mp709.relaysControl()
+        control.setId(id)
+        control.setState(state)
+        control.main()
+    except:
+        pass
+
+
+def update_game_id():
+    global gui
+    game_id = get_game_id()
+    gui.update_top_left("Game: " + str(game_id))
 
 
 def start_new_game():
-    urllib.request.urlopen(start_new_game_url)
+    try:
+        response = urllib2.urlopen(start_new_game_url)
+        # print response.info()
+        # html = response.read()
+        update_game_id()
+    except:
+        pass
 
 
 def fetch_form_db():
@@ -56,15 +75,40 @@ def fetch_form_db():
         print "MySQL ERROR:", e
 
 
+def get_game_id():
+    global gui
+    global game_id
+
+    try:
+        db = get_connection()
+
+        cur = db.cursor()
+
+        # Use all the SQL you like
+        cur.execute("SELECT timer_id FROM timer WHERE status = 0")
+
+        for row in cur.fetchall():
+            game_id = row[0]
+
+        db.close()
+
+        return game_id
+    except MySQLdb.Error, e:
+        print "MySQL ERROR:", e
+        return game_id
+
+
 def update_labels(action, t='0'):
     global attempt
 
-    gui.update_status(action.upper() + ' IS NEXT')
-    gui.update_attempt(str(attempt))
+    gui.update_status(action.upper())
+
     gui.update_countdown(t)
 
     if attempt > 1:
         gui.update_attempt(str(attempt) + '/' + str(attempts_limit), "darkred")
+    else:
+        gui.update_attempt("NEXT:")
 
 
 def tick():
@@ -101,16 +145,16 @@ def tick():
 def run_action(action):
     busy = True
     gui.update_status(action.upper(), "red")
+    print datetime.now().strftime('%H:%M:%S'), "Running action:", action
+
+    if action == 'start_new_game':
+        start_new_game()
 
     if action == 'readnum':
-        print "Running action:", action
         run_read_num()
-        print "Done"
 
     if action == 'photo':
-        print "Running action:", action
         run_take_photo()
-        print "Done"
 
     if action == 'all_dev_off':
         switch_dev(dev_shuffle, "off")
@@ -148,11 +192,17 @@ def run_take_photo():
         # retcode = proc.wait()
 
         im = cv2.imread(camera_image)
-        im = cv2.resize(im, (0, 0), fx=0.5, fy=0.5)
-        cv2.imwrite(images_folder + "resized.jpg", im)
-        gui.update_image(images_folder + "resized.jpg")
-    except Exception:
-        print Exception
+        img_height, img_width, a = im.shape
+
+        if img_width > 1000:
+            im = cv2.resize(im, (0, 0), fx=0.5, fy=0.5)
+            cv2.imwrite(images_folder + "resized.jpg", im)
+            gui.update_image(images_folder + "resized.jpg")
+        else:
+            gui.update_image(camera_image)
+
+    except:
+        pass
 
 
 def run_read_num():
@@ -163,23 +213,32 @@ def run_read_num():
     global attempts_limit
     global camera_image
     global images_folder
+    global start_time
 
     res_numbr = read_win_number(camera_image, images_folder + "final.jpg")
     fetch_form_db()
-    gui.update_image(images_folder + "grey_ball.jpg")
 
     if res_numbr == -1 and attempt < attempts_limit:
         steps = list(sequence_1)
         attempt += 1
-        step_id = 0
-    else:
-        attempt = 1
-        steps = list(main_sequence)
-        step_id = 0
+        step_id = -1
 
     if res_numbr == -2:
+        attempt = 1
         steps = list(sequence_2)
-        step_id = 0
+        step_id = -1
+
+    if res_numbr >= 0:
+        gui.update_image(images_folder + "final.jpg")
+        put_image_to_db(images_folder + "final.jpg")
+        attempt = 1
+        steps = list(main_sequence)
+        step_id = -1
+
+
+def put_image_to_db(image_name):
+    im = cv2.imread(image_name)
+    cv2.imwrite(images_folder + str(game_id) + ".jpg", im)
 
 
 def start_stop(label):
@@ -206,8 +265,10 @@ def reset_game():
     global steps
     global start_time
     global started
+    global step_id
 
     steps = list(main_sequence)
+    step_id = 0
     start_time = 0
     started = True
 
@@ -218,13 +279,41 @@ class BingoTkApp():
         self.end_item = None
         self.root = Tk()
         self.root.wm_title("Bingo GUI")
+
+        # self.font = tkFont.nametofont(self.img_box['font'])
+        self.font = tkFont.Font(family="Helvetica", size=14, weight="bold")
+
+        self.row0 = Frame(self.root)
+
+        # TOP RIGHT
+        self.lbl_top_rightest = Label(self.row0, width=10, height=2, text='', font=(self.font['family'], 14, 'bold'),
+                                      fg="darkgreen", bg='grey')
+        self.lbl_top_rightest.pack(side=RIGHT, fill=X, expand="yes")
+
+        # TOP RIGHT
+        self.lbl_top_right = Label(self.row0, width=10, height=2, text='', font=(self.font['family'], 14, 'bold'),
+                                   fg="darkgreen", bg='darkgrey')
+        self.lbl_top_right.pack(side=RIGHT, fill=X, expand="yes")
+
+        # TOP CENTER
+        self.lbl_top_center = Label(self.row0, width=30, height=2, text='', font=(self.font['family'], 14, 'bold'),
+                                    fg="darkgreen", bg='grey')
+
+        self.lbl_top_center.pack(side=RIGHT, fill=X, expand="yes")
+
+        # TOP LEFT
+        self.lbl_top_left = Label(self.row0, width=10, height=2, text='',
+                                  font=(self.font['family'], 14, 'bold'),
+                                  fg="darkgreen", bg='darkgrey')
+        self.lbl_top_left.pack(side=RIGHT, fill=X, expand="yes")
+
+        self.row0.pack(side=TOP, fill=BOTH)
+
         self.row1 = Frame(self.root)
 
         self.img = ImageTk.PhotoImage(Image.open(default_image))
         self.img_box = Label(self.row1, image=self.img, width=60, height=60, bg='grey')
         self.img_box.pack(side=LEFT, fill=BOTH, expand="yes")
-
-        self.font = tkFont.nametofont(self.img_box['font'])
 
         # self.scrollbar = Scrollbar(self.row1, orient=VERTICAL)
         # listbox = Listbox(frame, yscrollcommand=scrollbar.set)
@@ -251,7 +340,7 @@ class BingoTkApp():
         self.btn_start_stop.pack(side=RIGHT, fill=BOTH)
 
         # Countdown Label
-        self.lbl_countdown = Label(self.row2, width=10, height=2, text='0', font=(self.font['family'], 14, 'bold'),
+        self.lbl_countdown = Label(self.row2, width=10, height=2, text='', font=(self.font['family'], 14, 'bold'),
                                    fg="darkgreen", bg='darkgrey')
         self.lbl_countdown.pack(side=RIGHT, fill=X, expand="yes")
 
@@ -262,13 +351,17 @@ class BingoTkApp():
         self.lbl_status.pack(side=RIGHT, fill=X, expand="yes")
 
         # Attempt Label
-        self.lbl_attempt = Label(self.row2, width=10, height=2, text='0', font=(self.font['family'], 14, 'bold'),
+        self.lbl_attempt = Label(self.row2, width=10, height=2, text='', font=(self.font['family'], 14, 'bold'),
                                  fg="darkgreen", bg='darkgrey')
         self.lbl_attempt.pack(side=LEFT, fill=X, expand="yes")
 
         self.row2.pack(side=TOP, fill=BOTH)
 
         # threading.Thread.__init__(self)
+
+    def update_top_left(self, status_text, color="darkgreen"):
+        self.lbl_top_left.config(text=status_text)
+        self.lbl_top_left.config(fg=color)
 
     def update_image(self, image_name):
         self.img = ImageTk.PhotoImage(Image.open(image_name))
