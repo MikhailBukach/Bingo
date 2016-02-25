@@ -21,7 +21,19 @@ game_id = 0
 
 # def callback_threaded(label):
 #     threading.Thread(target=read_number(label)).start()
+def controls_info():
+    global gui
+    state = ("off","on")
+    control = mp709.relaysControl()
+    rels = control.enumerateRelays()
+    inf_str = ""
+    for ctrl in rels:
+        inf = ctrl.getInfo()
+        inf_str =  inf_str + " " + str(inf['id']) + ":" + str(state[int(ctrl.getPort())]) + "  "
 
+        print inf['id'], ":", state[int(ctrl.getPort())]
+
+    gui.update_top_center(inf_str)
 
 def switch_dev(id, state):
     try:
@@ -29,6 +41,7 @@ def switch_dev(id, state):
         control.setId(id)
         control.setState(state)
         control.main()
+
     except:
         pass
 
@@ -180,6 +193,7 @@ def run_action(action):
         switch_dev(dev_blow, "off")
 
     busy = False
+    controls_info()
 
 
 def run_take_photo():
@@ -358,6 +372,10 @@ class BingoTkApp():
         self.row2.pack(side=TOP, fill=BOTH)
 
         # threading.Thread.__init__(self)
+
+    def update_top_center(self, status_text, color="darkgreen"):
+        self.lbl_top_center.config(text=status_text)
+        self.lbl_top_center.config(fg=color)
 
     def update_top_left(self, status_text, color="darkgreen"):
         self.lbl_top_left.config(text=status_text)
