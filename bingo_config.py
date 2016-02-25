@@ -24,7 +24,7 @@ rotate_image_clockwize = 1
 
 # Settings for bingo_gui.py
 
-start_new_game_url = ''
+start_new_game_url = 'http://localhost/bingo'
 start_time = 0
 gui = None
 scheduler = None
@@ -33,16 +33,16 @@ busy = False
 delay = 0
 steps = []
 
-main_sequence = [("dummy", 5), ("start_new_game", 5), ("pickup_off", 2), ("shuffle_off", 2), ("blow_off", 2),
-                 ("delay", 10), ("shuffle_on", 5),
+main_sequence = [("main sequence", 1), ("pickup_off", 1), ("shuffle_off", 1), ("blow_off", 1),
+                 ("start_new_game", 5), ("shuffle_on", 1),
                  ("shuffle_off", 5), ("pickup_on", 3),
-                 ("photo", 3), ("readnum", 2)]
+                 ("photo", 1), ("readnum", 1)]
 
-sequence_1 = [("dummy", 2), ("blow_on", 3), ("blow_off", 3), ("photo", 2), ("readnum", 2)]
+sequence_1 = [("sequence -1", 2), ("blow_on", 1), ("blow_off", 2), ("photo", 3), ("readnum", 2)]
 
-sequence_2 = [("dummy", 5), ("pickup_off", 2), ("shuffle_off", 2), ("blow_off", 2), ("shuffle_on", 5),
-              ("shuffle_off", 5), ("delay", 3),
-              ("pickup", 3), ("photo", 2), ("readnum", 2)]
+sequence_2 = [("sequence -2", 2), ("pickup_off", 1), ("shuffle_off", 1), ("blow_off", 1), ("shuffle_on", 2),
+              ("shuffle_off", 5),
+              ("pickup", 3), ("photo", 3), ("readnum", 2)]
 attempt = 1
 attempts_limit = 3
 step_id = 0
