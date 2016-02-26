@@ -10,7 +10,7 @@ from pytesser import *
 from PIL import Image
 
 # i_img_name = 'unnamed.jpg'
-i_img_name = 'camera20.jpg'
+i_img_name = 'camera/unnamed.jpg'
 
 
 def find_a_ball(grey_image):
@@ -37,6 +37,7 @@ def find_a_ball(grey_image):
             output_image = output_image[y - r:r * 2 + y - r, x - r:r * 2 + x - r]
             grey_image = grey_image[y - r:r * 2 + y - r, x - r:r * 2 + x - r]
 
+            height, width, channels = grey_image.shape
             print "We have found a ball, image croped to", r * 2, r * 2
 
         # show the output image
@@ -203,12 +204,13 @@ def write_num_to_db(win_number):
     try:
         db = get_connection()
 
-        # you must create a Cursor object. It will let
-        #  you execute all the queries you need
         cur = db.cursor()
 
-        # Use all the SQL you like
-        cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + ", Status = 0 WHERE Status = 0")
+        if win_number >= 0:
+            cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + ", Status = 1 WHERE Status = 0")
+        else:
+            cur.execute("UPDATE timer SET WinNumber = " + str(win_number) + " WHERE Status = 0")
+
         db.commit()
 
         '''
@@ -631,7 +633,7 @@ def run_with_args(argv):
 
     if not os.path.isfile(input_img_name):
         # print 'input file ' + input_img_name + ' not exists'
-        input_img_name = images_folder + i_img_name
+        input_img_name = i_img_name
         # sys.exit(2)
 
     if not os.path.isfile(output_img_name):
