@@ -1,17 +1,18 @@
 from Tkinter import *
 import tkFont
-import subprocess
+# import subprocess
 from PIL import ImageTk, Image
 from bingo_config import *
 from bingo import *
 import os
 import time
-import threading
+# import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 import mp709
 # import urllib.request
 import urllib2
 from datetime import datetime
+import shutil
 
 game_id = 0
 
@@ -23,17 +24,22 @@ game_id = 0
 #     threading.Thread(target=read_number(label)).start()
 def controls_info():
     global gui
-    state = ("off","on")
-    control = mp709.relaysControl()
-    rels = control.enumerateRelays()
-    inf_str = ""
-    for ctrl in rels:
-        inf = ctrl.getInfo()
-        inf_str =  inf_str + " " + str(inf['id']) + ":" + str(state[int(ctrl.getPort())]) + "  "
 
-        print inf['id'], ":", state[int(ctrl.getPort())]
+    try:
+        state = ("off", "on")
+        control = mp709.relaysControl()
+        rels = control.enumerateRelays()
+        inf_str = ""
+        for r in rels:
+            inf = r.getInfo()
+            inf_str = inf_str + " " + str(inf['id']) + ":" + str(state[int(r.getPort())]) + "  "
 
-    gui.update_top_center(inf_str)
+            print inf['id'], ":", state[int(r.getPort())]
+
+        gui.update_top_center(inf_str)
+    except:
+        pass
+
 
 def switch_dev(id, state):
     try:
@@ -201,9 +207,9 @@ def run_take_photo():
     global images_folder
 
     try:
-        # args = [take_image_exec]
-        # proc = subprocess.Popen(args)
-        # retcode = proc.wait()
+        args = [take_image_exec]
+        proc = subprocess.Popen(args)
+        retcode = proc.wait()
 
         im = cv2.imread(camera_image)
         img_height, img_width, a = im.shape
@@ -244,15 +250,29 @@ def run_read_num():
 
     if res_numbr >= 0:
         gui.update_image(images_folder + "final.jpg")
-        put_image_to_db(images_folder + "final.jpg")
+        put_image_to_db(images_folder + "final.jpg", res_numbr)
         attempt = 1
         steps = list(main_sequence)
         step_id = -1
 
 
-def put_image_to_db(image_name):
-    im = cv2.imread(image_name)
-    cv2.imwrite(images_folder + str(game_id) + ".jpg", im)
+def put_image_to_db(image_name, res_numbr):
+    global game_id
+
+    try:
+        shutil.copyfile(image_name, images_folder + 'results' + "/" + str(game_id) + ".jpg")
+
+        db = get_connection()
+
+        blob_value = open(image_name, 'rb').read()
+        sql = 'INSERT INTO game_images_log (game_id, image_data, result_value) VALUES(%s,%s,%s)'
+        args = (game_id, blob_value, res_numbr)
+        cursor = db.cursor()
+        cursor.execute(sql, args)
+        db.commit()
+        db.close()
+    except:
+        pass
 
 
 def start_stop(label):
