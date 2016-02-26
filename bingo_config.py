@@ -38,7 +38,7 @@ main_sequence = [("main sequence", 1), ("pickup_off", 1), ("shuffle_off", 1), ("
                  ("shuffle_off", 5), ("pickup_on", 3),
                  ("photo", 1), ("readnum", 1)]
 
-sequence_1 = [("sequence -1", 2), ("blow_on", 1), ("blow_off", 2), ("photo", 3), ("readnum", 2)]
+sequence_1 = [("sequence -1", 2), ("blow_on", 1), ("blow_off", 2), ("photo", 2), ("readnum", 2)]
 
 sequence_2 = [("sequence -2", 2), ("pickup_off", 1), ("shuffle_off", 1), ("blow_off", 1), ("shuffle_on", 2),
               ("shuffle_off", 5),
