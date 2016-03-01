@@ -10,10 +10,10 @@ from PIL import Image
 
 max_contour_area = 1000
 
-min_contour_w = 10
-min_contour_h = 10
+min_contour_w = 4
+min_contour_h = 4
 images_folder = "images/"
-contour_distance = 15
+contour_distance = 16
 
 
 def read_image(image_name='croped.jpg'):
@@ -179,25 +179,80 @@ def filter_contours(contours):
     return (cnts)
 
 
+def auto_canny(image, sigma=0.33):
+    # compute the median of the single channel pixel intensities
+    v = np.median(image)
+
+    # apply automatic Canny edge detection using the computed median
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
+    edged = cv2.Canny(image, lower, upper)
+
+    # return the edged image
+    return edged
+
+
 def find_ball(source_img):
     gray = cv2.cvtColor(source_img.copy(), cv2.COLOR_GRAY2BGR)
 
     height, width, channels = gray.shape
 
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    blur = cv2.GaussianBlur(gray, (3, 3), 0)
 
-    canny = cv2.Canny(blur, 200, 300)
+    # canny = cv2.Canny(blur, 200, 300)
+    canny = auto_canny(blur)
 
-    # canny = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-    # cv2.imshow('detected circles', canny)
-    # cv2.waitKey(0)
+    thresh = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    cv2.imshow('detected circles', canny)
+    cv2.waitKey(0)
 
     _, contours, hierarchy = cv2.findContours(canny.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
+    # print hierarchy[0]
     contours = filter_contours(contours)
     blank_image = create_blank(width, height, (255, 255, 255))
 
-    blank, hulls = find_hulls(blank_image, contours)
+    i = 0
+    for comp in zip(contours, hierarchy[0]):
+        cnt, hier = comp
+
+        rect = cv2.minAreaRect(cnt)
+        ((x, y), (w, h), angle) = rect
+
+        hull = cv2.convexHull(cnt)
+        epsilon = 0.0001 * cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, epsilon, True)
+
+        if 100 > w > 5 and 100 > h > 5:
+            # cv2.drawContours(blank_image, [hull], 0, (0, 255, 0), 1)
+
+            cv2.drawContours(blank_image, [approx], 0, (0, 0, 0), 1)
+
+    gray = cv2.cvtColor(blank_image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+
+    cv2.imshow('gray circles', thresh)
+    cv2.waitKey(0)
+    _, contours, hierarchy = cv2.findContours(thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours = filter_contours(contours)
+    blur, hulls = find_hulls(blur, contours)
+    # cv2.drawContours(blur, [approx], 0, (0, 0, 0), -1)
+    # cv2.imshow('gray circles', blur)
+    # cv2.waitKey(0)
+
+    # font = cv2.FONT_HERSHEY_SIMPLEX
+    # cv2.putText(blank_image, str(i + 1), (int(x), int(y)), font, 0.5, (0, 0, 0), 1)
+    # print hier
+    # cv2.imshow('detected circles', blank_image)
+    # cv2.waitKey(0)
+
+
+
+
+    # i += 1
+    # blank, hulls = find_hulls(blank_image, contours)
+    # cv2.imshow('detected circles', blank)
+    # cv2.waitKey(0)
     r_text = []
     f_list = []
     i = 0
@@ -205,63 +260,58 @@ def find_ball(source_img):
         # min Area Rect of joined contours
         rect = cv2.minAreaRect(hull)
         ((x, y), (w, h), angle) = rect
-        box = cv2.boxPoints(rect)
-        box = np.int0(box)
-        cv2.drawContours(blank, [box], 0, (0, 255, 0), 1)
+        if  w >= 30 and h >= 30:
+            # box = cv2.boxPoints(rect)
+            # box = np.int0(box)
+            # cv2.drawContours(blank, [box], 0, (0, 255, 0), 1)
 
-        # Bounding Rect of joined contours
-        [x, y, w, h] = cv2.boundingRect(hull)
-        cv2.rectangle(blank, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            # Bounding Rect of joined contours
+            [x, y, w, h] = cv2.boundingRect(hull)
+            # cv2.rectangle(blank, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
-        croped_hull = source_img[y:y + h, x:x + w]
-        croped_hull_thresh = cv2.adaptiveThreshold(croped_hull.copy(), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-        # croped_hull_thresh = cv2.Canny(croped_hull.copy(), 100, 100)
-        # cv2.imshow('croped_hull_thresh', croped_hull_thresh)
-        # cv2.waitKey(0)
+            croped_hull = thresh[y:y + h, x:x + w]
 
-        # _, croped_hull_thresh = cv2.threshold(croped_hull.copy(), 180, 255, cv2.THRESH_BINARY)
-        # _, contours, hierarchy = cv2.findContours(croped_hull_thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        # contours = filter_contours(contours)
-        # blank_hull_image = create_blank(w, h, (255, 255, 255))
-        # cv2.drawContours(blank_hull_image, contours, -1, (0, 0, 0), -1)
-        # cv2.imshow('blank_hull_image', blank_hull_image)
-        #
-        # cv2.waitKey(0)
+            croped_hull_rotated = rotate_about_center(croped_hull, angle)
 
-        croped_hull_rotated = rotate_about_center(croped_hull_thresh, angle)
 
-        im_rotated_name = images_folder + "deg_norm_" + str(i) + ".jpg"
+            i += 1
 
-        cv2.imwrite(im_rotated_name, croped_hull_rotated)
+            croped_hull_rotated = rotate_about_center(croped_hull_rotated, angle)
+            cv2.imshow('detected circles', croped_hull_rotated)
+            cv2.waitKey(0)
 
-        # Text recognition
-        txt = read_image(im_rotated_name)
-        if len(txt) == 2 and is_int(txt):
-            if num_in_range(int(txt), 0, 36):
-                r_text.append(txt)
-                f_list.append(im_rotated_name)
+            im_rotated_name = images_folder + "deg_norm_" + str(i) + ".jpg"
 
-        degrees = [90, 180, 270]
-
-        for index in range(len(degrees)):
-            new_im_name = images_folder + "deg_" + str(degrees[index]) + "_" + str(i) + ".jpg"
-
-            im_rotated_to_angle = rotate_about_center(croped_hull_rotated, degrees[index])
-            cv2.imwrite(new_im_name, im_rotated_to_angle)
+            cv2.imwrite(im_rotated_name, croped_hull_rotated)
 
             # Text recognition
-            txt = read_image(new_im_name)
+            txt = read_image(im_rotated_name)
             if len(txt) == 2 and is_int(txt):
                 if num_in_range(int(txt), 0, 36):
                     r_text.append(txt)
-                    f_list.append(new_im_name)
+                    f_list.append(im_rotated_name)
 
-        i += 1
+            degrees = [90, 180, 270]
+
+            for index in range(len(degrees)):
+                new_im_name = images_folder + "deg_" + str(degrees[index]) + "_" + str(i) + ".jpg"
+
+                im_rotated_to_angle = rotate_about_center(croped_hull_rotated, degrees[index])
+                cv2.imwrite(new_im_name, im_rotated_to_angle)
+
+                # Text recognition
+                txt = read_image(new_im_name)
+                if len(txt) == 2 and is_int(txt):
+                    if num_in_range(int(txt), 0, 36):
+                        r_text.append(txt)
+                        f_list.append(new_im_name)
+    #
+    # i += 1
 
     print r_text, f_list
-    cv2.drawContours(blank, contours, -1, (0, 0, 0), -1)
+    # cv2.drawContours(blank_image, contours, -1, (255, 0, 0), -1)
 
-    cv2.imshow('detected circles', blank)
+    cv2.imshow('detected circles', blank_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
