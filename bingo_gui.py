@@ -22,6 +22,32 @@ game_id = 0
 
 # def callback_threaded(label):
 #     threading.Thread(target=read_number(label)).start()
+def get_controls_state(control_id):
+    global gui
+    ret_state = "none"
+    state = ("off", "on")
+
+    try:
+
+        control = mp709.relaysControl()
+        rels = control.enumerateRelays()
+
+        for r in rels:
+            inf = r.getInfo()
+
+            if inf['id'] == control_id:
+                ret_state = str(state[int(r.getPort())])
+
+        print get_current_time(), "get_controls_state control_id:", control_id, "state:", ret_state
+        return ret_state
+
+
+    except:
+        pass
+        print get_current_time(), "get_controls_state control_id:", control_id, "state:", ret_state
+        return ret_state
+
+
 def controls_info():
     global gui
 
@@ -42,12 +68,16 @@ def controls_info():
 
 
 def switch_dev(id, state):
+    global step_id
+
     try:
         control = mp709.relaysControl()
         control.setId(id)
         control.setState(state)
         control.main()
 
+        if get_controls_state(id) != state:
+            step_id = step_id - 1
     except:
         pass
 
@@ -161,10 +191,14 @@ def tick():
                 start_time = time.clock()
 
 
+def get_current_time():
+    return datetime.now().strftime('%H:%M:%S')
+
+
 def run_action(action):
     busy = True
     gui.update_status(action.upper(), "red")
-    print datetime.now().strftime('%H:%M:%S'), "Running action:", action
+    print get_current_time(), "Running action:", action
 
     if action == 'start_new_game':
         start_new_game()
@@ -205,6 +239,8 @@ def run_action(action):
 def run_take_photo():
     global camera_image
     global images_folder
+    global game_id
+    global attempt
 
     try:
         args = [take_image_exec]
@@ -213,6 +249,8 @@ def run_take_photo():
 
         im = cv2.imread(camera_image)
         img_height, img_width, a = im.shape
+
+        shutil.copyfile(camera_image, 'camera/history/' + str(game_id) + "_" + str(attempt) + ".jpg")
 
         if img_width > 1000:
             im = cv2.resize(im, (0, 0), fx=0.5, fy=0.5)
@@ -244,6 +282,8 @@ def run_read_num():
         step_id = -1
 
     if res_numbr == -2:
+        dialog = BingoDialog(gui.root)
+        gui.root.wait_window(dialog.top)
         attempt = 1
         steps = list(sequence_2)
         step_id = -1
@@ -281,6 +321,11 @@ def start_stop(label):
     global started
     global start_time
 
+    dialog = BingoNotFoundDialog(gui.root)
+    gui.root.wait_window(dialog.root)
+
+    print dialog.result
+
     if not started:
         if len(steps) < 1:
             reset_game()
@@ -305,6 +350,51 @@ def reset_game():
     step_id = 0
     start_time = 0
     started = True
+
+
+class BingoNotFoundDialog:
+    def __init__(self, parent):
+        self.root = Toplevel(parent)
+        self.row0 = Frame(self.root)
+
+        self.font = tkFont.Font(family="Helvetica", size=14, weight="bold")
+
+        self.messageLabel = Label(self.row0, text='The ball not found!', width=30, height=3,
+                                  font=(self.font['family'], 36, 'bold'),
+                                  fg="darkgreen", bg='grey')
+
+        self.messageLabel.pack(side=LEFT, fill=X, expand="yes")
+        self.row0.pack(side=TOP, fill=BOTH)
+
+        self.row1 = Frame(self.root)
+
+        self.confirmButton = Button(self.row1, text='Yes, try to pick up next one', width=20, height=2,
+                                    font=(self.font['family'], 14, 'bold'),
+                                    fg="darkgreen", bg='grey', command=self.confirm)
+
+        self.confirmButton.pack(side=LEFT, fill=X, expand="yes")
+
+        self.cancelButton = Button(self.row1, text='No, try to read number', width=20, height=2,
+                                   font=(self.font['family'], 14, 'bold'),
+                                   fg="darkred", bg='grey', command=self.cancel)
+        self.cancelButton.pack(side=LEFT, fill=X, expand="yes")
+
+        self.row1.pack(side=TOP, fill=BOTH)
+
+        self.root.grab_set()
+
+        self.root.protocol("WM_DELETE_WINDOW", self.cancel)
+        self.root.geometry("+%d+%d" % (parent.winfo_rootx()+50,
+                                  parent.winfo_rooty()+50))
+        # self.root.initial_focus.focus_set()
+
+    def confirm(self):
+        self.result = "ok"
+        self.root.destroy()
+
+    def cancel(self):
+        self.result = "cancel"
+        self.root.destroy()
 
 
 # class BingoTkApp(threading.Thread):
