@@ -1,0 +1,90 @@
+import cv2
+import numpy as np
+from os import listdir
+from os.path import isfile, join
+import sys, getopt
+import time
+import math
+from pytesser import *
+from PIL import Image
+import random
+
+
+def create_blank(width, height, rgb_color=(0, 0, 0)):
+    """Create new image(numpy array) filled with certain color in RGB"""
+    # Create black blank image
+    image = np.zeros((height, width, 3), np.uint8)
+
+    # Since OpenCV uses BGR, convert the color first
+    color = tuple(reversed(rgb_color))
+    # Fill image with color
+    image[:] = color
+
+    return image
+
+
+def auto_canny(image, sigma=0.33):
+    # compute the median of the single channel pixel intensities
+    v = np.median(image)
+
+    # apply automatic Canny edge detection using the computed median
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
+    edged = cv2.Canny(image, lower, upper)
+
+    # return the edged image
+    return edged
+
+
+def find_ball(source_img):
+    gray = cv2.cvtColor(source_img.copy(), cv2.COLOR_GRAY2BGR)
+
+    height, width, channels = gray.shape
+
+    blur = cv2.GaussianBlur(gray, (3, 3), 0)
+
+    # canny = cv2.Canny(blur, 200, 300)
+    canny = auto_canny(blur)
+    # canny = cv2.Canny(blur, 10, 20)
+    # canny = cv2.Canny(blur, 300, 450)
+
+    # cv2.imshow('detected circles', canny)
+    # cv2.waitKey(0)
+
+    _, contours, hierarchy = cv2.findContours(canny.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    blank = create_blank(width, height, (255, 255, 255))
+    i = 0
+    for cnt in contours:
+        # cv2.drawContours(blank, [cnt], 0, (random.randint(1, 254), random.randint(1, 254), random.randint(1, 254)), 2)
+        rect = cv2.minAreaRect(cnt)
+        ((x, y), (w, h), angle) = rect
+
+        j = 0
+        for cnt1 in contours:
+            rect1 = cv2.minAreaRect(cnt1)
+            ((x1, y1), (w1, h1), angle1) = rect1
+            if i != j and w1 * h1 > 25:
+                hull = cv2.convexHull(cnt)
+                hull1 = cv2.convexHull(cnt1)
+                ret = cv2.matchShapes(hull, hull1, 1, 0.0)
+                if ret < 0.01:
+                    rColor = (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150))
+                    cv2.drawContours(blank, [hull], 0, rColor, 2)
+                    cv2.drawContours(blank, [hull1], 0, rColor, 2)
+                    cv2.line(blank, (int(x), int(y)), (int(x1), int(y1)),
+                             (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150)))
+                    print ret
+            j += 1
+        i += 1
+        # cv2.imshow('blank', blank)
+        # cv2.waitKey(0)
+    cv2.imshow('blank', blank)
+    cv2.waitKey(0)
+
+
+onlyfiles = [f for f in listdir("camera/") if isfile(join("camera/", f))]
+for fname in onlyfiles:
+    img = cv2.imread('camera/' + fname, 0)
+    img = cv2.resize(img, (0, 0), fx=0.5, fy=0.5)
+    find_ball(img)
