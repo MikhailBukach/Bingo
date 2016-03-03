@@ -9,6 +9,8 @@ from pytesser import *
 from PIL import Image
 import random
 
+match_contours = []
+
 
 def create_blank(width, height, rgb_color=(0, 0, 0)):
     """Create new image(numpy array) filled with certain color in RGB"""
@@ -37,6 +39,8 @@ def auto_canny(image, sigma=0.33):
 
 
 def find_ball(source_img):
+    global match_contours
+
     gray = cv2.cvtColor(source_img.copy(), cv2.COLOR_GRAY2BGR)
 
     height, width, channels = gray.shape
@@ -52,30 +56,64 @@ def find_ball(source_img):
     # cv2.waitKey(0)
 
     _, contours, hierarchy = cv2.findContours(canny.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
     blank = create_blank(width, height, (255, 255, 255))
+
+    def pick_contour(event, x, y, flags, param):
+        # print event
+        if event == 1 or event == 2:
+            for cnt in contours:
+                # hull = cv2.convexHull(cnt)
+                dist = cv2.pointPolygonTest(cnt, (x, y), True)
+                # print dist
+                if dist >= 0:
+                    if event == 1:
+                        cv2.drawContours(blank, [cnt], 0, (0, 0, 255), 2)
+                        epsilon = 0.0001 * cv2.arcLength(cnt, True)
+                        approx = cv2.approxPolyDP(cnt, epsilon, True)
+                        match_contours.append(approx)
+                        print "match_contours", len(match_contours)
+                    else:
+                        cv2.drawContours(blank, [cnt], 0, (255, 0, 0), 2)
+
+    cv2.namedWindow('blank')
+    cv2.setMouseCallback('blank', pick_contour)
+    cv2.drawContours(blank, contours, -1, (0, 0, 0), 1)
+
+    while (1):
+        cv2.imshow('blank', blank)
+        if cv2.waitKey(20) & 0xFF == 27:
+            break
+    cv2.destroyAllWindows()
+
     i = 0
     for cnt in contours:
         # cv2.drawContours(blank, [cnt], 0, (random.randint(1, 254), random.randint(1, 254), random.randint(1, 254)), 2)
-        rect = cv2.minAreaRect(cnt)
+        hull = cv2.convexHull(cnt)
+        rect = cv2.minAreaRect(hull)
         ((x, y), (w, h), angle) = rect
-
         j = 0
-        for cnt1 in contours:
-            rect1 = cv2.minAreaRect(cnt1)
-            ((x1, y1), (w1, h1), angle1) = rect1
-            if i != j and w1 * h1 > 25:
-                hull = cv2.convexHull(cnt)
-                hull1 = cv2.convexHull(cnt1)
-                ret = cv2.matchShapes(hull, hull1, 1, 0.0)
-                if ret < 0.01:
-                    rColor = (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150))
-                    cv2.drawContours(blank, [hull], 0, rColor, 2)
-                    cv2.drawContours(blank, [hull1], 0, rColor, 2)
-                    cv2.line(blank, (int(x), int(y)), (int(x1), int(y1)),
-                             (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150)))
-                    print ret
-            j += 1
+        if w * h > 800:
+            for match_cnt in match_contours:
+
+                if 1 == 1:
+
+                    # hull1 = cv2.convexHull(cnt1)
+
+                    rect1 = cv2.minAreaRect(match_cnt)
+                    ((x1, y1), (w1, h1), angle1) = rect1
+                    epsilon = 0.0001 * cv2.arcLength(cnt, True)
+                    approx = cv2.approxPolyDP(cnt, epsilon, True)
+
+                    ret = cv2.matchShapes(approx, match_cnt, 1, 0.0)
+                    print "ret", ret
+                    if ret < 0.1:
+                        rColor = (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150))
+                        cv2.drawContours(blank, [cnt], 0, rColor, 2)
+                        cv2.drawContours(blank, [match_cnt], 0, (0,0,255), 1)
+                        cv2.line(blank, (int(x), int(y)), (int(x1), int(y1)),
+                                 (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150)))
+                        print ret
+                j += 1
         i += 1
         # cv2.imshow('blank', blank)
         # cv2.waitKey(0)
