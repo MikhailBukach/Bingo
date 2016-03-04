@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 from os import listdir
 from os.path import isfile, join
 import sys, getopt
@@ -8,8 +9,10 @@ import math
 from pytesser import *
 from PIL import Image
 import random
+import pickle
 
 match_contours = []
+mode = "all"
 
 
 def create_blank(width, height, rgb_color=(0, 0, 0)):
@@ -38,6 +41,31 @@ def auto_canny(image, sigma=0.33):
     return edged
 
 
+def approx_contour(cnt):
+    epsilon = 0.0001 * cv2.arcLength(cnt, True)
+    approx = cv2.approxPolyDP(cnt, epsilon, True)
+    return approx
+
+
+def get_contours():
+
+
+    pkl_file = open('numbers.pkl', 'rb')
+    data = pickle.load(pkl_file)
+    return data
+
+
+def save_contour(cnt):
+    if not os.path.isfile('numbers.pkl'):
+        output = open('numbers.pkl', 'wb')
+        pickle.dump([cnt], output)
+    else:
+        cnts = get_contours()
+        cnts.append(cnt)
+        output = open('numbers.pkl', 'wb')
+        pickle.dump(cnts, output)
+
+
 def find_ball(source_img):
     global match_contours
 
@@ -59,25 +87,67 @@ def find_ball(source_img):
     blank = create_blank(width, height, (255, 255, 255))
 
     def pick_contour(event, x, y, flags, param):
-        # print event
-        if event == 1 or event == 2:
+        print event
+        if event == 1:
             for cnt in contours:
-                # hull = cv2.convexHull(cnt)
-                dist = cv2.pointPolygonTest(cnt, (x, y), True)
+                approx_cnt = approx_contour(cnt)
+                dist = cv2.pointPolygonTest(approx_cnt, (x, y), True)
                 # print dist
                 if dist >= 0:
                     if event == 1:
-                        cv2.drawContours(blank, [cnt], 0, (0, 0, 255), 2)
-                        epsilon = 0.0001 * cv2.arcLength(cnt, True)
-                        approx = cv2.approxPolyDP(cnt, epsilon, True)
-                        match_contours.append(approx)
+                        cv2.drawContours(blank, [approx_cnt], 0, (0, 0, 255), 2)
+
+                        match_contours.append(approx_cnt)
+                        save_contour(approx_cnt)
                         print "match_contours", len(match_contours)
                     else:
-                        cv2.drawContours(blank, [cnt], 0, (255, 0, 0), 2)
+                        cv2.drawContours(blank, [approx_cnt], 0, (255, 0, 0), 2)
 
     cv2.namedWindow('blank')
     cv2.setMouseCallback('blank', pick_contour)
-    cv2.drawContours(blank, contours, -1, (0, 0, 0), 1)
+
+    if mode == "training":
+        cv2.drawContours(blank, contours, -1, (0, 0, 0), 1)
+
+
+
+    if mode == "all":
+        match_contours = get_contours()
+
+        i = 0
+        for cnt in contours:
+            # cv2.drawContours(blank, [cnt], 0, (random.randint(1, 254), random.randint(1, 254), random.randint(1, 254)), 2)
+            # hull = cv2.convexHull(cnt)
+            rect = cv2.minAreaRect(cnt)
+            ((x, y), (w, h), angle) = rect
+            j = 0
+            if 2000 > w * h > 300:
+                for match_cnt in match_contours:
+
+                    if 1 == 1:
+
+                        # hull1 = cv2.convexHull(cnt1)
+
+                        # rect1 = cv2.minAreaRect(match_cnt)
+                        # ((x1, y1), (w1, h1), angle1) = rect1
+                        approx_cnt = approx_contour(cnt)
+                        cv2.drawContours(blank, [approx_cnt], -1, (0, 0, 255), -1)
+
+                        ret = cv2.matchShapes(approx_cnt, match_cnt, 1, 0.0)
+                        # print "ret", ret
+                        if ret < 0.5:
+                            # rColor = (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150))
+                            cv2.drawContours(blank, [approx_cnt], 0, (0, 255, 0), 2)
+                            # cv2.drawContours(blank, [match_cnt], 0, (0, 0, 255), 1)
+                            # cv2.line(blank, (int(x), int(y)), (int(x1), int(y1)),
+                            #          (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150)))
+                            print ret
+                    j += 1
+            i += 1
+            # cv2.imshow('blank', blank)
+            # cv2.waitKey(0)
+        # cv2.imshow('blank', blank)
+        # cv2.waitKey(0)
 
     while (1):
         cv2.imshow('blank', blank)
@@ -85,44 +155,16 @@ def find_ball(source_img):
             break
     cv2.destroyAllWindows()
 
-    i = 0
-    for cnt in contours:
-        # cv2.drawContours(blank, [cnt], 0, (random.randint(1, 254), random.randint(1, 254), random.randint(1, 254)), 2)
-        hull = cv2.convexHull(cnt)
-        rect = cv2.minAreaRect(hull)
-        ((x, y), (w, h), angle) = rect
-        j = 0
-        if w * h > 800:
-            for match_cnt in match_contours:
 
-                if 1 == 1:
-
-                    # hull1 = cv2.convexHull(cnt1)
-
-                    rect1 = cv2.minAreaRect(match_cnt)
-                    ((x1, y1), (w1, h1), angle1) = rect1
-                    epsilon = 0.0001 * cv2.arcLength(cnt, True)
-                    approx = cv2.approxPolyDP(cnt, epsilon, True)
-
-                    ret = cv2.matchShapes(approx, match_cnt, 1, 0.0)
-                    print "ret", ret
-                    if ret < 0.1:
-                        rColor = (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150))
-                        cv2.drawContours(blank, [cnt], 0, rColor, 2)
-                        cv2.drawContours(blank, [match_cnt], 0, (0,0,255), 1)
-                        cv2.line(blank, (int(x), int(y)), (int(x1), int(y1)),
-                                 (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150)))
-                        print ret
-                j += 1
-        i += 1
-        # cv2.imshow('blank', blank)
-        # cv2.waitKey(0)
-    cv2.imshow('blank', blank)
-    cv2.waitKey(0)
-
-
-onlyfiles = [f for f in listdir("camera/") if isfile(join("camera/", f))]
+dir = "camera/history/"
+# dir = "camera/img/"
+onlyfiles = [f for f in listdir(dir) if isfile(join(dir, f))]
 for fname in onlyfiles:
-    img = cv2.imread('camera/' + fname, 0)
-    img = cv2.resize(img, (0, 0), fx=0.5, fy=0.5)
+    img = cv2.imread(dir + fname, 0)
+    img_height, img_width = img.shape
+
+
+    if img_width > 1000:
+        img = cv2.resize(img, (0, 0), fx=0.5, fy=0.5)
+    # img = cv2.resize(img, (0, 0), fx=0.5, fy=0.5)
     find_ball(img)
