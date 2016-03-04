@@ -10,9 +10,16 @@ from pytesser import *
 from PIL import Image
 import random
 import pickle
+from Tkinter import *
+import tkFont
 
 match_contours = []
+mode = "training"
 mode = "all"
+# mode = "training"
+
+prevX = 0
+prevY = 0
 
 
 def create_blank(width, height, rgb_color=(0, 0, 0)):
@@ -42,42 +49,64 @@ def auto_canny(image, sigma=0.33):
 
 
 def approx_contour(cnt):
-    epsilon = 0.0001 * cv2.arcLength(cnt, True)
+    epsilon = 0.00001 * cv2.arcLength(cnt, True)
     approx = cv2.approxPolyDP(cnt, epsilon, True)
     return approx
 
 
 def get_contours():
-
-
-    pkl_file = open('numbers.pkl', 'rb')
+    pkl_file = open('contours.pkl', 'rb')
     data = pickle.load(pkl_file)
     return data
 
 
-def save_contour(cnt):
-    if not os.path.isfile('numbers.pkl'):
-        output = open('numbers.pkl', 'wb')
+def get_answers():
+    pkl_file = open('answers.pkl', 'rb')
+    data = pickle.load(pkl_file)
+    return data
+
+
+def save_contour(cnt, answer):
+    if not os.path.isfile('contours.pkl'):
+        # os.mknod("numbers.pkl")
+        output = open('contours.pkl', 'wb')
         pickle.dump([cnt], output)
+
+        output = open('answers.pkl', 'wb')
+        pickle.dump([answer], output)
     else:
         cnts = get_contours()
+        answs = get_answers()
+
+        print len(cnts), "contours loaded"
+        print len(answs), "answers loaded"
+
         cnts.append(cnt)
-        output = open('numbers.pkl', 'wb')
+        answs.append(answer)
+
+        output = open('contours.pkl', 'wb')
         pickle.dump(cnts, output)
+
+        output = open('answers.pkl', 'wb')
+        pickle.dump(answs, output)
 
 
 def find_ball(source_img):
     global match_contours
 
-    gray = cv2.cvtColor(source_img.copy(), cv2.COLOR_GRAY2BGR)
+    # gray = cv2.cvtColor(source_img.copy(), cv2.COLOR_GRAY2BGR)
+    gray = cv2.cvtColor(source_img.copy(), cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(source_img, cv2.COLOR_BGR2GRAY)
 
-    height, width, channels = gray.shape
+    height, width = gray.shape
 
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
 
     # canny = cv2.Canny(blur, 200, 300)
-    canny = auto_canny(blur)
+    # canny = auto_canny(blur)
     # canny = cv2.Canny(blur, 10, 20)
+    # canny = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    _, canny = cv2.threshold(blur, 170, 255, cv2.THRESH_BINARY)
     # canny = cv2.Canny(blur, 300, 450)
 
     # cv2.imshow('detected circles', canny)
@@ -87,21 +116,35 @@ def find_ball(source_img):
     blank = create_blank(width, height, (255, 255, 255))
 
     def pick_contour(event, x, y, flags, param):
-        print event
-        if event == 1:
+        global prevX
+        global prevY
+        # if event != 0:
+        # print event, x, y, flags, param
+        state = 0
+
+        if event == 1 and flags == 1:
+
             for cnt in contours:
+
                 approx_cnt = approx_contour(cnt)
                 dist = cv2.pointPolygonTest(approx_cnt, (x, y), True)
                 # print dist
                 if dist >= 0:
-                    if event == 1:
-                        cv2.drawContours(blank, [approx_cnt], 0, (0, 0, 255), 2)
+                    if event == 1 and flags == 1 and x != prevX and y != prevY:
+                        prevX = x
+                        prevY = y
+                        print event, x, y, flags, param
 
-                        match_contours.append(approx_cnt)
-                        save_contour(approx_cnt)
-                        print "match_contours", len(match_contours)
-                    else:
-                        cv2.drawContours(blank, [approx_cnt], 0, (255, 0, 0), 2)
+                        cv2.drawContours(blank, [approx_cnt], 0, (0, 0, 255), 2)
+                        input = InputNumber()
+                        input.run()
+                        print "input.number", input.number
+
+                        if input.number != -1:
+                            cv2.drawContours(blank, [approx_cnt], 0, (0, 0, 255), 1)
+                            save_contour(approx_cnt, input.number)
+                        else:
+                            cv2.drawContours(blank, [approx_cnt], 0, (255, 0, 0), 1)
 
     cv2.namedWindow('blank')
     cv2.setMouseCallback('blank', pick_contour)
@@ -109,10 +152,11 @@ def find_ball(source_img):
     if mode == "training":
         cv2.drawContours(blank, contours, -1, (0, 0, 0), 1)
 
-
-
     if mode == "all":
         match_contours = get_contours()
+        answers = get_answers()
+
+        print "match_contours", len(match_contours)
 
         i = 0
         for cnt in contours:
@@ -120,34 +164,53 @@ def find_ball(source_img):
             # hull = cv2.convexHull(cnt)
             rect = cv2.minAreaRect(cnt)
             ((x, y), (w, h), angle) = rect
-            j = 0
-            if 2000 > w * h > 300:
-                for match_cnt in match_contours:
 
+            approx_cnt = approx_contour(cnt)
+            cv2.drawContours(blank, [approx_cnt], -1, (0, 0, 0), 1)
+
+
+            j = 0
+            match_numbers = []
+            if 2000 > w * h > 300 and h < 100 and w < 100:
+                hull =  cv2.convexHull(cnt)
+
+                M = cv2.moments(hull)
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                for cont_and_answer in zip(match_contours, answers):
+                    match_cnt = cont_and_answer[0]
+                    answer = cont_and_answer[1]
                     if 1 == 1:
 
                         # hull1 = cv2.convexHull(cnt1)
 
                         # rect1 = cv2.minAreaRect(match_cnt)
                         # ((x1, y1), (w1, h1), angle1) = rect1
-                        approx_cnt = approx_contour(cnt)
-                        cv2.drawContours(blank, [approx_cnt], -1, (0, 0, 255), -1)
+
+
 
                         ret = cv2.matchShapes(approx_cnt, match_cnt, 1, 0.0)
+
                         # print "ret", ret
-                        if ret < 0.5:
+                        if ret < 0.08:
                             # rColor = (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150))
                             cv2.drawContours(blank, [approx_cnt], 0, (0, 255, 0), 2)
+                            match_numbers.append(answer)
                             # cv2.drawContours(blank, [match_cnt], 0, (0, 0, 255), 1)
-                            # cv2.line(blank, (int(x), int(y)), (int(x1), int(y1)),
-                            #          (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150)))
-                            print ret
-                    j += 1
-            i += 1
-            # cv2.imshow('blank', blank)
-            # cv2.waitKey(0)
-        # cv2.imshow('blank', blank)
-        # cv2.waitKey(0)
+
+                        print ret
+                        j += 1
+                        i += 1
+                        # cv2.imshow('blank', blank)
+                        # cv2.waitKey(0)
+                        # cv2.imshow('blank', blank)
+                        # cv2.waitKey(0)
+            if len(match_numbers) > 0:
+                cv2.line(blank, (cX, cY), (cX + 20, cY - 20),
+                         (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150)))
+
+                cv2.putText(blank, "".join(match_numbers), (cX + 20, cY - 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
     while (1):
         cv2.imshow('blank', blank)
@@ -156,13 +219,81 @@ def find_ball(source_img):
     cv2.destroyAllWindows()
 
 
+class InputNumber():
+    def __init__(self):
+        self.root = Tk()
+        self.root.wm_title("Inter number for the contour")
+
+        self.font = tkFont.Font(family="Helvetica", size=14, weight="bold")
+
+        self.row0 = Frame(self.root)
+        self.label = Label(self.row0, text="Number:", width=6, height=2,
+                           font=(self.font['family'], 12, 'bold'),
+                           fg="darkgreen", bg='grey')
+        self.label.pack(side=LEFT, fill=X, expand="yes")
+
+        self.entry = Entry(self.row0, width=2,
+                           font=(self.font['family'], 26, 'bold'),
+                           fg="darkgreen", bg='white')
+        self.entry.pack(side=LEFT, fill=X, expand="yes")
+
+        self.row0.pack(side=TOP, fill=BOTH)
+
+        self.row1 = Frame(self.root)
+        self.btnCancel = Button(self.row1, text="Cancel", command=self.cancel, width=8, height=2,
+                                font=(self.font['family'], 12, 'bold'),
+                                fg="darkgreen", bg='grey')
+        self.btnCancel.pack(side=RIGHT, fill=X, expand="yes")
+
+        self.btnOk = Button(self.row1, text="Ok", command=self.confirm, width=8, height=2,
+                            font=(self.font['family'], 12, 'bold'),
+                            fg="darkgreen", bg='grey')
+        self.btnOk.pack(side=RIGHT, fill=X, expand="yes")
+
+        self.row1.pack(side=TOP, fill=BOTH)
+
+        self.root.grab_set()
+
+        self.root.protocol("WM_DELETE_WINDOW", self.cancel)
+        self.center()
+        self.entry.focus_set()
+
+    def cancel(self):
+        self.number = -1
+        self.root.destroy()
+
+    def confirm(self):
+        self.number = self.entry.get()
+        self.root.destroy()
+
+    def center(self):
+        """
+        centers a tkinter window
+        :param win: the root or Toplevel window to center
+        """
+        # self.update_idletasks()
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        frm_width = self.root.winfo_rootx() - self.root.winfo_x()
+        win_width = width + 2 * frm_width
+        height = self.root.winfo_height()
+        titlebar_height = self.root.winfo_rooty() - self.root.winfo_y()
+        win_height = height + titlebar_height + frm_width
+        x = self.root.winfo_screenwidth() // 2 - win_width // 2
+        y = self.root.winfo_screenheight() // 2 - win_height // 2
+        self.root.geometry('{}x{}+{}+{}'.format(width, height, x, y))
+        self.root.deiconify()
+
+    def run(self):
+        self.root.mainloop()
+
+
 dir = "camera/history/"
 # dir = "camera/img/"
 onlyfiles = [f for f in listdir(dir) if isfile(join(dir, f))]
 for fname in onlyfiles:
-    img = cv2.imread(dir + fname, 0)
-    img_height, img_width = img.shape
-
+    img = cv2.imread(dir + fname)
+    img_height, img_width,a = img.shape
 
     if img_width > 1000:
         img = cv2.resize(img, (0, 0), fx=0.5, fy=0.5)
