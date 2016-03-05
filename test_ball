@@ -51,7 +51,7 @@ def auto_canny(image, sigma=0.33):
 def approx_contour(cnt):
     epsilon = 0.00001 * cv2.arcLength(cnt, True)
     approx = cv2.approxPolyDP(cnt, epsilon, True)
-    return approx
+    return cnt
 
 
 def get_contours():
@@ -103,10 +103,10 @@ def find_ball(source_img):
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
 
     # canny = cv2.Canny(blur, 200, 300)
-    # canny = auto_canny(blur)
+    canny = auto_canny(blur)
     # canny = cv2.Canny(blur, 10, 20)
-    # canny = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-    _, canny = cv2.threshold(blur, 170, 255, cv2.THRESH_BINARY)
+    # canny = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 111, 2)
+    # _, canny = cv2.threshold(blur, 170, 255, cv2.THRESH_BINARY)
     # canny = cv2.Canny(blur, 300, 450)
 
     # cv2.imshow('detected circles', canny)
@@ -150,7 +150,7 @@ def find_ball(source_img):
     cv2.setMouseCallback('blank', pick_contour)
 
     if mode == "training":
-        cv2.drawContours(blank, contours, -1, (0, 0, 0), 1)
+        cv2.drawContours(blank, contours, -1, (0, 0, 0), -1)
 
     if mode == "all":
         match_contours = get_contours()
@@ -171,7 +171,7 @@ def find_ball(source_img):
 
             j = 0
             match_numbers = []
-            if 2000 > w * h > 300 and h < 100 and w < 100:
+            if 20000 > w * h > 300 and h < 1000 and w < 1000:
                 hull =  cv2.convexHull(cnt)
 
                 M = cv2.moments(hull)
@@ -192,7 +192,7 @@ def find_ball(source_img):
                         ret = cv2.matchShapes(approx_cnt, match_cnt, 1, 0.0)
 
                         # print "ret", ret
-                        if ret < 0.08:
+                        if ret < 0.1:
                             # rColor = (random.randint(1, 150), random.randint(1, 150), random.randint(1, 150))
                             cv2.drawContours(blank, [approx_cnt], 0, (0, 255, 0), 2)
                             match_numbers.append(answer)
@@ -288,7 +288,7 @@ class InputNumber():
         self.root.mainloop()
 
 
-dir = "camera/history/"
+dir = "camera/img/"
 # dir = "camera/img/"
 onlyfiles = [f for f in listdir(dir) if isfile(join(dir, f))]
 for fname in onlyfiles:
