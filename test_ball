@@ -22,6 +22,20 @@ prevX = 0
 prevY = 0
 
 
+def filter_contours(contours, min_w, max_w, min_h, max_h):
+    def is_match(cnt, min_w, max_w, min_h, max_h):
+        rect = cv2.minAreaRect(cnt)
+        ((x, y), (w, h), angle) = rect
+        if min_w <= w <= max_w and min_h <= h <= max_h:
+            return 1
+        else:
+            return 0
+
+    cnts = [c for c in contours if is_match(c, min_w, max_w, min_h, max_h) > 0]
+
+    return (cnts)
+
+
 def create_blank(width, height, rgb_color=(0, 0, 0)):
     """Create new image(numpy array) filled with certain color in RGB"""
     # Create black blank image
@@ -51,6 +65,7 @@ def auto_canny(image, sigma=0.33):
 def approx_contour(cnt):
     epsilon = 0.00001 * cv2.arcLength(cnt, True)
     approx = cv2.approxPolyDP(cnt, epsilon, True)
+    hull = cv2.convexHull(cnt)
     return cnt
 
 
@@ -102,17 +117,24 @@ def find_ball(source_img):
 
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
 
+    # blur = cv2.bilateralFilter(gray, (3, 3), 0)
+
     # canny = cv2.Canny(blur, 200, 300)
     canny = auto_canny(blur)
     # canny = cv2.Canny(blur, 10, 20)
-    # canny = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 111, 2)
+    # canny = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 1111, 2)
     # _, canny = cv2.threshold(blur, 170, 255, cv2.THRESH_BINARY)
-    # canny = cv2.Canny(blur, 300, 450)
+    canny = cv2.Canny(blur, 10, 10)
+
+
 
     # cv2.imshow('detected circles', canny)
     # cv2.waitKey(0)
 
     _, contours, hierarchy = cv2.findContours(canny.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    contours = filter_contours(contours,15,60,15,60)
+
     blank = create_blank(width, height, (255, 255, 255))
 
     def pick_contour(event, x, y, flags, param):
@@ -168,11 +190,10 @@ def find_ball(source_img):
             approx_cnt = approx_contour(cnt)
             cv2.drawContours(blank, [approx_cnt], -1, (0, 0, 0), 1)
 
-
             j = 0
             match_numbers = []
             if 20000 > w * h > 300 and h < 1000 and w < 1000:
-                hull =  cv2.convexHull(cnt)
+                hull = cv2.convexHull(cnt)
 
                 M = cv2.moments(hull)
                 cX = int(M["m10"] / M["m00"])
@@ -288,12 +309,12 @@ class InputNumber():
         self.root.mainloop()
 
 
-dir = "camera/img/"
+dir = "camera/history/"
 # dir = "camera/img/"
 onlyfiles = [f for f in listdir(dir) if isfile(join(dir, f))]
 for fname in onlyfiles:
     img = cv2.imread(dir + fname)
-    img_height, img_width,a = img.shape
+    img_height, img_width, a = img.shape
 
     if img_width > 1000:
         img = cv2.resize(img, (0, 0), fx=0.5, fy=0.5)
